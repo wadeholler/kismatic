@@ -1,27 +1,27 @@
 package cli
 
 import (
+	"context"
 	"io"
 	"log"
+	nethttp "net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	nethttp "net/http"
-
+	"github.com/apprenda/kismatic/pkg/controller"
+	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/server/http"
 	"github.com/apprenda/kismatic/pkg/server/http/handler"
-	"github.com/apprenda/kismatic/pkg/server/http/service"
 	"github.com/apprenda/kismatic/pkg/store"
-
 	"github.com/spf13/cobra"
 )
 
 const (
-	loggerPrefix          = "[kismatic] "
-	defaultTimeout        = 10 * time.Second
-	clustersServiceBucket = "kismatic"
+	loggerPrefix   = "[kismatic] "
+	defaultTimeout = 10 * time.Second
+	clustersBucket = "kismatic"
 )
 
 type serverOptions struct {
@@ -31,11 +31,12 @@ type serverOptions struct {
 	dbFile   string
 }
 
+// NewCmdServer returns the server command
 func NewCmdServer(stdout io.Writer) *cobra.Command {
 	var options serverOptions
 	cmd := &cobra.Command{
 		Use:   "server",
-		Short: "server starts an http server",
+		Short: "server starts an HTTP server",
 		Long: `
 Start an HTTP server to manage KET clusters. The API has endpoints to create, mutate, delete and view clusters.
 
@@ -59,9 +60,11 @@ If cert-file or key-file are not provided, a self-signed CA will be used to crea
 
 func doServer(stdout io.Writer, options serverOptions) error {
 	logger := log.New(stdout, "[kismatic] ", log.LstdFlags|log.Lshortfile)
+	genAssetsDir := "server-assets"
 
 	// Create the store
-	s, err := store.NewBoltDB(options.dbFile, 0600, logger)
+	s, err := store.New(options.dbFile, 0600, logger)
+	defer s.Close()
 	if err != nil {
 		logger.Fatalf("Error creating store: %v", err)
 	}
@@ -70,9 +73,10 @@ func doServer(stdout io.Writer, options serverOptions) error {
 		logger.Fatalf("Error creating bucket in store: %v", err)
 	}
 
-	// create services and handlers
-	clusterService := service.NewClustersService(s, clustersServiceBucket)
-	clusterAPI := handler.Clusters{Service: clusterService}
+	clusterStore := store.NewClusterStore(s, clustersBucket)
+
+	// create handlers
+	clusterAPI := handler.Clusters{Store: clusterStore}
 
 	// Setup the HTTP server
 	server := http.HttpServer{
@@ -95,11 +99,29 @@ func doServer(stdout io.Writer, options serverOptions) error {
 		}
 	}()
 
+	// Setup the controller
+	executorOpts := install.ExecutorOptions{
+		GeneratedAssetsDirectory: genAssetsDir,
+		RunsDirectory:            "server-runs",
+		RestartServices:          true,
+		OutputFormat:             "simple",
+		Verbose:                  true,
+	}
+	executor, err := install.NewExecutor(stdout, os.Stderr, executorOpts)
+	if err != nil {
+		return err
+	}
+
+	ctrl := controller.New(logger, executor, clusterStore, genAssetsDir, 10*time.Minute)
+	ctx, cancel := context.WithCancel(context.Background())
+	go ctrl.Run(ctx)
+
 	// Setup interrupt channel for graceful shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	<-stop
+	cancel()
 	if err := server.Shutdown(30 * time.Second); err != nil {
 		logger.Fatalf("Error shutting down server: %v", err)
 	}

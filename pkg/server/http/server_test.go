@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/apprenda/kismatic/pkg/server/http/handler"
-	"github.com/apprenda/kismatic/pkg/server/http/service"
 	"github.com/apprenda/kismatic/pkg/store"
 )
 
@@ -21,7 +20,7 @@ func setupStore() (store.WatchedStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	s, err := store.NewBoltDB(f.Name(), 0644, log.New(ioutil.Discard, "test ", 0))
+	s, err := store.New(f.Name(), 0644, log.New(ioutil.Discard, "test ", 0))
 	if err != nil {
 		return nil, err
 	}
@@ -81,12 +80,13 @@ func TestNewHTTPServer(t *testing.T) {
 			valid:        false,
 		},
 	}
-	store, err := setupStore()
+	s, err := setupStore()
+	defer s.Close()
 	if err != nil {
 		t.Fatalf("could not create store: %v", err)
 	}
-	clusterService := service.NewClustersService(store, bucket)
-	clusterAPI := handler.Clusters{Service: clusterService}
+	clusterStore := store.NewClusterStore(s, bucket)
+	clusterAPI := handler.Clusters{Store: clusterStore}
 	for _, test := range tests {
 		server := HttpServer{
 			Logger:       test.logger,
