@@ -10,7 +10,6 @@ import (
 
 	"github.com/apprenda/kismatic/pkg/server/http"
 	"github.com/apprenda/kismatic/pkg/server/http/handler"
-	"github.com/apprenda/kismatic/pkg/server/http/service"
 	"github.com/apprenda/kismatic/pkg/store"
 )
 
@@ -26,16 +25,19 @@ func main() {
 		port = os.Getenv("PORT")
 	}
 	logger := http.DefaultLogger(os.Stdout, "[kismatic] ")
-	store, err := store.NewBoltDB("/tmp/kismatic", 0644, logger)
+	s, err := store.New("/tmp/kismatic", 0644, logger)
+	defer s.Close()
 	if err != nil {
 		logger.Fatalf("Error opening store: %v", err)
 	}
-	if err := store.CreateBucket(bucket); err != nil {
+	if err := s.CreateBucket(bucket); err != nil {
 		logger.Fatalf("Error creating bucket: %v", err)
 	}
-	// create services and handlers
-	clusterService := service.NewClustersService(store, bucket)
-	clusterAPI := handler.Clusters{Service: clusterService}
+
+	clusterStore := store.NewClusterStore(s, bucket)
+
+	// create handlers
+	clusterAPI := handler.Clusters{Store: clusterStore}
 
 	// Setup the HTTP server
 	server := http.HttpServer{
