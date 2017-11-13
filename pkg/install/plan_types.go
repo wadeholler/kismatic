@@ -78,29 +78,16 @@ type Plan struct {
 
 type Provisioner struct {
 	// The provider where the infrastructue will be provisioned to.
-	// The provider will expect provider specific ENV variables to be set.
+	// The provisioner will expect provider specific ENV variables to be set.
 	// Options: aws
 	Provider string
-	// Options that are specific to the chosen infrastructure provider.
-	AWSOptions *AWSProviderOptions `yaml:"options,omitempty"`
+	// AWS specific options.
+	// Only set if using "aws" provider
+	AWSOptions *AWSProvisionerOptions `yaml:"options,omitempty"`
 }
 
-// AWSProviderOptions contains specific options used when provisioning infrastructue
-// TODO determine what those are
-type AWSProviderOptions struct {
-	Region            string `json:"region"`
-	AccessKey         string `json:"access_key"`
-	SecretKey         string `json:"secret_key"`
-	PrivateSSHKeyPath string `json:"private_ssh_key_path"`
-	PublicSSHKey      string `json:"public_ssh_key"`
-	ClusterName       string `json:"cluster_name"`
-	AMI               string `json:"ami"`
-	EC2InstanceType   string `json:"instance_size"`
-	MasterCount       int    `json:"master_count"`
-	EtcdCount         int    `json:"etcd_count"`
-	WorkerCount       int    `json:"worker_count"`
-	IngressCount      int    `json:"ingress_count"`
-	StorageCount      int    `json:"storage_count"`
+// AWSProvisionerOptions contains specific options used when provisioning infrastructue
+type AWSProvisionerOptions struct {
 }
 
 // Cluster describes a Kubernetes cluster
