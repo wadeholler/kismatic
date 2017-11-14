@@ -128,6 +128,16 @@ resource "aws_instance" "master" {
   tags {
     Name = "kismatic - master"
   }
+
+    provisioner "remote-exec" {
+      inline = ["echo ready"]
+
+      connection {
+        type = "ssh"
+        user = "ubuntu"
+        private_key = "${file("${var.private_ssh_key_path}")}"
+      }
+    }
 }
 
 resource "aws_instance" "etcd" {
@@ -140,6 +150,16 @@ resource "aws_instance" "etcd" {
   tags {
     Name = "kismatic - etcd"
   }
+
+  provisioner "remote-exec" {
+      inline = ["echo ready"]
+
+      connection {
+        type = "ssh"
+        user = "ubuntu"
+        private_key = "${file("${var.private_ssh_key_path}")}"
+      }
+    }
 }
 
 resource "aws_instance" "worker" {
@@ -152,6 +172,16 @@ resource "aws_instance" "worker" {
   tags {
     Name = "kismatic - worker"
   }
+
+  provisioner "remote-exec" {
+      inline = ["echo ready"]
+
+      connection {
+        type = "ssh"
+        user = "ubuntu"
+        private_key = "${file("${var.private_ssh_key_path}")}"
+      }
+    }
 }
 
 resource "aws_instance" "ingress" {
@@ -164,6 +194,16 @@ resource "aws_instance" "ingress" {
   tags {
     Name = "kismatic - ingress"
   }
+
+  provisioner "remote-exec" {
+      inline = ["echo ready"]
+
+      connection {
+        type = "ssh"
+        user = "ubuntu"
+        private_key = "${file("${var.private_ssh_key_path}")}"
+      }
+    }
 }
 
 resource "aws_instance" "storage" {
@@ -176,11 +216,21 @@ resource "aws_instance" "storage" {
   tags {
     Name = "kismatic - storage"
   }
+
+  provisioner "remote-exec" {
+      inline = ["echo ready"]
+
+      connection {
+        type = "ssh"
+        user = "ubuntu"
+        private_key = "${file("${var.private_ssh_key_path}")}"
+      }
+    }
 }
 
 
 data "template_file" "kismatic_cluster" {
-  template = "${file("${path.module}/../../clusters/dev/kismatic-cluster.yaml.tpl")}"
+  template = "${file("${path.module}/../../clusters/${var.cluster_name}/kismatic-cluster.yaml.tpl")}"
   vars {
     etcd_pub_ip = "${aws_instance.etcd.0.public_ip}"
     master_pub_ip = "${aws_instance.master.0.public_ip}"

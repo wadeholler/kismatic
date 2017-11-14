@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/apprenda/kismatic/pkg/install"
+	"github.com/apprenda/kismatic/pkg/provision"
 	"github.com/apprenda/kismatic/pkg/store"
 )
 
@@ -21,14 +22,19 @@ type ClusterController interface {
 // against a specific cluster.
 type ExecutorCreator func(clusterName string) (install.Executor, error)
 
+// ProvisionerCreator creates provisioners that can be used for standing up
+// infrastructure for a specific cluster.
+type ProvisionerCreator func(store.Cluster) provision.Provisioner
+
 // New returns a cluster controller
-func New(l *log.Logger, execCreator ExecutorCreator, cs store.ClusterStore, reconFreq time.Duration) ClusterController {
+func New(l *log.Logger, execCreator ExecutorCreator, provisionerCreator ProvisionerCreator, cs store.ClusterStore, reconFreq time.Duration) ClusterController {
 	return &multiClusterController{
 		log:                l,
 		newExecutor:        execCreator,
 		clusterStore:       cs,
 		reconcileFreq:      reconFreq,
 		clusterControllers: make(map[string]chan<- struct{}),
+		provisionerCreator: provisionerCreator,
 	}
 }
 
@@ -44,7 +50,7 @@ func New(l *log.Logger, execCreator ExecutorCreator, cs store.ClusterStore, reco
 //     - runs/
 func DefaultExecutorCreator(rootDir string) ExecutorCreator {
 	return func(clusterName string) (install.Executor, error) {
-		err := os.MkdirAll(filepath.Join(rootDir, clusterName), 0600)
+		err := os.MkdirAll(filepath.Join(rootDir, clusterName), 0700)
 		if err != nil {
 			return nil, fmt.Errorf("error creating directories for executor: %v", err)
 		}
@@ -63,5 +69,23 @@ func DefaultExecutorCreator(rootDir string) ExecutorCreator {
 			return nil, err
 		}
 		return executor, nil
+	}
+}
+
+// DefaultProvisionerCreator uses terraform for provisioning infrastructure
+// on the clouds we support.
+func DefaultProvisionerCreator(terraform provision.Terraform) ProvisionerCreator {
+	return func(cluster store.Cluster) provision.Provisioner {
+		switch cluster.Plan.Provisioner.Provider {
+		case "aws":
+			p := provision.AWS{
+				KeyID:     cluster.AwsID,
+				Secret:    cluster.AwsKey,
+				Terraform: terraform,
+			}
+			return p
+		default:
+			panic(fmt.Sprintf("provider not supported: %q", cluster.Plan.Provisioner.Provider))
+		}
 	}
 }
