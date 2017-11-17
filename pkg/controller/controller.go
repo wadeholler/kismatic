@@ -46,7 +46,7 @@ func New(l *log.Logger, execCreator ExecutorCreator, provisionerCreator Provisio
 // cluster executor:
 // - clusterName/
 //     - kismatic.log
-//     - generated/
+//     - assets/
 //     - runs/
 func DefaultExecutorCreator(rootDir string) ExecutorCreator {
 	return func(clusterName string) (install.Executor, error) {
@@ -59,7 +59,7 @@ func DefaultExecutorCreator(rootDir string) ExecutorCreator {
 			return nil, fmt.Errorf("error creating log file for executor: %v", err)
 		}
 		executorOpts := install.ExecutorOptions{
-			GeneratedAssetsDirectory: filepath.Join(rootDir, clusterName, "generated"),
+			GeneratedAssetsDirectory: filepath.Join(rootDir, clusterName, "assets"),
 			RunsDirectory:            filepath.Join(rootDir, clusterName, "runs"),
 			OutputFormat:             "simple",
 			Verbose:                  true,
@@ -79,8 +79,8 @@ func DefaultProvisionerCreator(terraform provision.Terraform) ProvisionerCreator
 		switch cluster.Plan.Provisioner.Provider {
 		case "aws":
 			p := provision.AWS{
-				KeyID:     cluster.AwsID,
-				Secret:    cluster.AwsKey,
+				KeyID:     cluster.ProvisionerCredentials.AWS.AccessKeyId,
+				Secret:    cluster.ProvisionerCredentials.AWS.SecretAccessKey,
 				Terraform: terraform,
 			}
 			return p
