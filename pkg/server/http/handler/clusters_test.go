@@ -365,6 +365,15 @@ func TestCreateGetGetandDelete(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v: %s",
 			status, http.StatusOK, rr.Body.String())
 	}
+	resp := make([]ClusterResponse, 0)
+	err = json.NewDecoder(rr.Body).Decode(&resp)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(resp) != 1 {
+		t.Errorf("handler returned unexpected body: got %v want %v",
+			rr.Body.String(), expected)
+	}
 
 	// should delete
 	req, err = http.NewRequest("DELETE", "/clusters/foo", nil)
@@ -398,8 +407,12 @@ func TestCreateGetGetandDelete(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v: %s",
 			status, http.StatusOK, rr.Body.String())
 	}
-	expected = "[]\n"
-	if rr.Body.String() != expected {
+	resp = make([]ClusterResponse, 0)
+	err = json.NewDecoder(rr.Body).Decode(&resp)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(resp) != 1 && resp[0].DesiredState != "destroyed" {
 		t.Errorf("handler returned unexpected body: got %v want %v",
 			rr.Body.String(), expected)
 	}

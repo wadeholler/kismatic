@@ -103,7 +103,7 @@ func (p *Provisioner) validate() (bool, []error) {
 }
 
 func formatErrs(errs []error) []string {
-	out := make([]string, 0)
+	out := make([]string, 0, len(errs))
 	for _, err := range errs {
 		out = append(out, err.Error())
 	}
@@ -146,9 +146,9 @@ type Cluster struct {
 }
 
 type AWSProvisionerOptions struct {
-	*install.AWSProvisionerOptions
-	AccessKeyID     string `json:"accessKeyID"`
-	SecretAccessKey string `json:"secretAccessKey"`
+	install.AWSProvisionerOptions
+	AccessKeyID     string `json:"accessKeyID,omitempty"`
+	SecretAccessKey string `json:"secretAccessKey,omitempty"`
 }
 
 type Clusters struct {
@@ -187,7 +187,13 @@ func (api Clusters) Create(w http.ResponseWriter, r *http.Request, _ httprouter.
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
-	if err := putToStore(req, api.Store); err != nil {
+	sc, err := buildStoreCluster(req)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		api.Logger.Println(errorf(err.Error()))
+		return
+	}
+	if err := putToStore(req.Name, *sc, api.Store); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		api.Logger.Println(errorf(err.Error()))
 		return
@@ -197,7 +203,8 @@ func (api Clusters) Create(w http.ResponseWriter, r *http.Request, _ httprouter.
 }
 
 func (api Clusters) Get(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	clusterResp, err := getFromStore(p.ByName("name"), api.Store)
+	id := p.ByName("name")
+	fromStore, err := getFromStore(id, api.Store)
 	if err != nil {
 		if err == ErrClusterNotFound {
 			w.WriteHeader(http.StatusNotFound)
@@ -208,6 +215,7 @@ func (api Clusters) Get(w http.ResponseWriter, r *http.Request, p httprouter.Par
 		return
 	}
 
+	clusterResp := buildResponse(id, *fromStore)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	err = enc.Encode(clusterResp)
@@ -220,13 +228,17 @@ func (api Clusters) Get(w http.ResponseWriter, r *http.Request, p httprouter.Par
 }
 
 func (api Clusters) GetAll(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	clustersResp, err := getAllFromStore(api.Store)
+	fromStore, err := getAllFromStore(api.Store)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		api.Logger.Println(errorf(err.Error()))
 		return
 	}
 
+	clustersResp := make([]ClusterResponse, 0, len(fromStore))
+	for key, sc := range fromStore {
+		clustersResp = append(clustersResp, buildResponse(key, sc))
+	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	err = enc.Encode(clustersResp)
@@ -242,19 +254,21 @@ func (api Clusters) GetAll(w http.ResponseWriter, r *http.Request, p httprouter.
 // 404 is returned if the cluster is not found in the store
 func (api Clusters) Delete(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("name")
-	exists, err := existsInStore(id, api.Store)
+	fromStore, err := getFromStore(id, api.Store)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		if err == ErrClusterNotFound {
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		api.Logger.Println(errorf(err.Error()))
 		return
 	}
-	if !exists {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	if err := api.Store.Delete(id); err != nil {
+	// update the state and put to the store
+	fromStore.DesiredState = "destroyed"
+	if err := putToStore(id, *fromStore, api.Store); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		api.Logger.Println(errorf("could not delete from the store: %v", err))
+		api.Logger.Println(errorf(err.Error()))
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
@@ -349,44 +363,8 @@ func (api Clusters) GetAssets(w http.ResponseWriter, r *http.Request, p httprout
 	http.ServeFile(w, r, tmpf.Name())
 }
 
-func putToStore(req *ClusterRequest, cs store.ClusterStore) error {
-	// build the plan template
-	planTemplate := install.PlanTemplateOptions{
-		EtcdNodes:    req.EtcdCount,
-		MasterNodes:  req.MasterCount,
-		WorkerNodes:  req.WorkerCount,
-		IngressNodes: req.IngressCount,
-	}
-	planner := &install.BytesPlanner{}
-	if err := install.WritePlanTemplate(planTemplate, planner); err != nil {
-		return fmt.Errorf("could not decode request body: %v", err)
-	}
-	var p *install.Plan
-	p, err := planner.Read()
-	if err != nil {
-		return fmt.Errorf("could not read plan: %v", err)
-	}
-	// set some defaults in the plan
-	p.Cluster.Name = req.Name
-	p.Provisioner = install.Provisioner{Provider: req.Provisioner.Provider, AWSOptions: req.Provisioner.AWSOptions.AWSProvisionerOptions}
-	sc := store.Cluster{
-		DesiredState: req.DesiredState,
-		CurrentState: "planned",
-		Plan:         *p,
-		CanContinue:  true,
-	}
-	switch p.Provisioner.Provider {
-	case "aws":
-		creds := store.ProvisionerCredentials{
-			AWS: store.AWSCredentials{
-				AccessKeyId:     req.Provisioner.AWSOptions.AccessKeyID,
-				SecretAccessKey: req.Provisioner.AWSOptions.SecretAccessKey,
-			},
-		}
-		sc.ProvisionerCredentials = creds
-	}
-
-	if err := cs.Put(req.Name, sc); err != nil {
+func putToStore(name string, toStore store.Cluster, cs store.ClusterStore) error {
+	if err := cs.Put(name, toStore); err != nil {
 		return fmt.Errorf("could not put to the store: %v", err)
 	}
 	return nil
@@ -400,7 +378,7 @@ func existsInStore(name string, cs store.ClusterStore) (bool, error) {
 	return sc != nil, nil
 }
 
-func getFromStore(name string, cs store.ClusterStore) (*ClusterResponse, error) {
+func getFromStore(name string, cs store.ClusterStore) (*store.Cluster, error) {
 	sc, err := cs.Get(name)
 	if err != nil {
 		return nil, fmt.Errorf("could not get from the store: %v", err)
@@ -408,23 +386,62 @@ func getFromStore(name string, cs store.ClusterStore) (*ClusterResponse, error) 
 	if sc == nil {
 		return nil, ErrClusterNotFound
 	}
-	resp := buildResponse(name, *sc)
-	return &resp, nil
+	return sc, nil
 }
 
-func getAllFromStore(cs store.ClusterStore) ([]ClusterResponse, error) {
+func getAllFromStore(cs store.ClusterStore) (map[string]store.Cluster, error) {
 	msc, err := cs.GetAll()
 	if err != nil {
 		return nil, fmt.Errorf("could not get from the store: %v", err)
 	}
-	resp := make([]ClusterResponse, 0)
 	if msc == nil {
-		return resp, nil
+		return make(map[string]store.Cluster, 0), nil
 	}
-	for key, sc := range msc {
-		resp = append(resp, buildResponse(key, sc))
+	return msc, nil
+}
+
+func buildStoreCluster(req *ClusterRequest) (*store.Cluster, error) {
+	// build the plan template
+	planTemplate := install.PlanTemplateOptions{
+		EtcdNodes:    req.EtcdCount,
+		MasterNodes:  req.MasterCount,
+		WorkerNodes:  req.WorkerCount,
+		IngressNodes: req.IngressCount,
 	}
-	return resp, nil
+	planner := &install.BytesPlanner{}
+	if err := install.WritePlanTemplate(planTemplate, planner); err != nil {
+		return nil, fmt.Errorf("could not decode request body: %v", err)
+	}
+	var p *install.Plan
+	p, err := planner.Read()
+	if err != nil {
+		return nil, fmt.Errorf("could not read plan: %v", err)
+	}
+	// set some defaults in the plan
+	p.Cluster.Name = req.Name
+	p.Provisioner = install.Provisioner{Provider: req.Provisioner.Provider}
+	if req.Provisioner.AWSOptions != nil {
+		p.Provisioner.AWSOptions = &req.Provisioner.AWSOptions.AWSProvisionerOptions
+	}
+	sc := &store.Cluster{
+		DesiredState: req.DesiredState,
+		CurrentState: "planned",
+		Plan:         *p,
+		CanContinue:  true,
+	}
+	switch p.Provisioner.Provider {
+	case "aws":
+		if req.Provisioner.AWSOptions != nil {
+			creds := store.ProvisionerCredentials{
+				AWS: store.AWSCredentials{
+					AccessKeyId:     req.Provisioner.AWSOptions.AccessKeyID,
+					SecretAccessKey: req.Provisioner.AWSOptions.SecretAccessKey,
+				},
+			}
+			sc.ProvisionerCredentials = creds
+		}
+	}
+	return sc, nil
 }
 
 func buildResponse(name string, sc store.Cluster) ClusterResponse {
@@ -435,7 +452,7 @@ func buildResponse(name string, sc store.Cluster) ClusterResponse {
 	case "aws":
 		if sc.Plan.Provisioner.AWSOptions != nil {
 			provisioner.AWSOptions = &AWSProvisionerOptions{
-				AWSProvisionerOptions: sc.Plan.Provisioner.AWSOptions,
+				AWSProvisionerOptions: *sc.Plan.Provisioner.AWSOptions,
 			}
 		}
 	}
