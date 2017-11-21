@@ -46,7 +46,7 @@ func cloudProviders() []string {
 // Plan is the installation plan that the user intends to execute
 type Plan struct {
 	// Infrastructure provisioner
-	Provisioner Provisioner `yaml:"provisioner,omitempty"`
+	Provisioner Provisioner `yaml:"provisioner"`
 	// Kubernetes cluster configuration
 	// +required
 	Cluster Cluster
@@ -88,6 +88,9 @@ type Provisioner struct {
 
 // AWSProvisionerOptions contains specific options used when provisioning infrastructue
 type AWSProvisionerOptions struct {
+	// The AWS region to deploy in
+	// +required
+	Region string `yaml:"region`
 }
 
 // Cluster describes a Kubernetes cluster
@@ -465,7 +468,14 @@ type NodeGroup struct {
 }
 
 // An OptionalNodeGroup is a collection of nodes that can be empty
-type OptionalNodeGroup NodeGroup
+type OptionalNodeGroup struct {
+	// Number of nodes.
+	// +required
+	ExpectedCount int `yaml:"expected_count"`
+	// List of nodes.
+	// +required
+	Nodes []Node
+}
 
 // A Node is a compute unit, virtual or physical, that is part of the cluster
 type Node struct {

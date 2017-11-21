@@ -138,8 +138,7 @@ func TestDetectNodeUpgradeSafetyMasterCountUnsafe(t *testing.T) {
 func TestDetectNodeUpgradeSafetyMasterLoadBalancingUnsafe(t *testing.T) {
 	plan := Plan{
 		Master: MasterNodeGroup{
-			ExpectedCount:    2,
-			LoadBalancedFQDN: "foo",
+			ExpectedCount: 2,
 			Nodes: []Node{
 				{
 					Host: "foo",
@@ -150,6 +149,8 @@ func TestDetectNodeUpgradeSafetyMasterLoadBalancingUnsafe(t *testing.T) {
 					IP:   "10.0.0.2",
 				},
 			},
+			LoadBalancedFQDN:      "foo",
+			LoadBalancedShortName: "bar",
 		},
 	}
 	node := plan.Master.Nodes[0]
@@ -165,8 +166,7 @@ func TestDetectNodeUpgradeSafetyMasterLoadBalancingUnsafe(t *testing.T) {
 func TestDetectNodeUpgradeSafetyMasterLoadBalancingSafe(t *testing.T) {
 	plan := Plan{
 		Master: MasterNodeGroup{
-			ExpectedCount:    2,
-			LoadBalancedFQDN: "someLoadBalancer",
+			ExpectedCount: 2,
 			Nodes: []Node{
 				{
 					Host: "foo",
@@ -177,6 +177,8 @@ func TestDetectNodeUpgradeSafetyMasterLoadBalancingSafe(t *testing.T) {
 					IP:   "10.0.0.2",
 				},
 			},
+			LoadBalancedFQDN:      "someLoadBalancer",
+			LoadBalancedShortName: "someShortName",
 		},
 	}
 	node := plan.Master.Nodes[0]

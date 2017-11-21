@@ -136,7 +136,7 @@ func (v *validator) valid() (bool, []error) {
 
 func (p *Plan) validate() (bool, []error) {
 	v := newValidator()
-
+	v.validate(&p.Provisioner)
 	v.validate(&p.Cluster)
 	v.validate(&p.DockerRegistry)
 	if p.Cluster.DisconnectedInstallation && !p.PrivateRegistryProvided() {
@@ -153,6 +153,33 @@ func (p *Plan) validate() (bool, []error) {
 	v.validate(&p.NFS)
 	v.validateWithErrPrefix("Storage nodes", &p.Storage)
 
+	return v.valid()
+}
+
+func (p *Provisioner) validate() (bool, []error) {
+	awsRegionsRegexp := `(us-(east|west)-(1|2))|
+								((ca|eu)-central-1)|
+								(eu-west-(1|2))|
+								(ap-(north|south)east-(1|2))|
+								(ap-south-1)|
+								(sa-east-1)|`
+
+	v := newValidator()
+	if !util.Contains(p.Provider, InfrastructureProviders()) {
+		v.addError(fmt.Errorf("%q is not a valid provisioner provider. Options are %v", p.Provider, InfrastructureProviders()))
+	}
+	switch p.Provider {
+	case "aws":
+		if p.AWSOptions != nil {
+			validAwsRegion, err := regexp.MatchString(awsRegionsRegexp, p.AWSOptions.Region)
+			if err != nil {
+				v.addError(fmt.Errorf("Could not determine if %q is an AWS region: %v", p.AWSOptions.Region, err))
+			}
+			if !validAwsRegion {
+				v.addError(fmt.Errorf("%q is not a valid AWS region", p.AWSOptions.Region))
+			}
+		}
+	}
 	return v.valid()
 }
 
