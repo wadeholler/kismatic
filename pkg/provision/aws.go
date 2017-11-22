@@ -165,7 +165,6 @@ func (aws AWS) Destroy(clusterName string) error {
 	cmd.Stdout = aws.Terraform.Output
 	cmd.Stderr = aws.Terraform.Output
 	cmd.Env = aws.getCommandEnvironment()
-	fmt.Println(cmd.Env)
 	dir, err := aws.getClusterStateDir(clusterName)
 	cmd.Dir = dir
 	if err != nil {
