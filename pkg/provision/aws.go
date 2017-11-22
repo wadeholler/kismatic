@@ -31,7 +31,7 @@ func (aws AWS) Provision(plan install.Plan) (*install.Plan, error) {
 	}
 
 	// Setup the environment for all Terraform commands.
-	cmdEnv := aws.getCommandEnvironment()
+	cmdEnv := append(os.Environ(), aws.getCommandEnvironment()...)
 	cmdDir := clusterStateDir
 	providerDir := fmt.Sprintf("../../providers/%s", plan.Provisioner.Provider)
 
@@ -164,7 +164,7 @@ func (aws AWS) Destroy(clusterName string) error {
 	cmd := exec.Command(aws.BinaryPath, "destroy", "-force")
 	cmd.Stdout = aws.Terraform.Output
 	cmd.Stderr = aws.Terraform.Output
-	cmd.Env = aws.getCommandEnvironment()
+	cmd.Env = append(os.Environ(), aws.getCommandEnvironment()...)
 	dir, err := aws.getClusterStateDir(clusterName)
 	cmd.Dir = dir
 	if err != nil {
