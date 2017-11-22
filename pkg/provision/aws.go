@@ -143,7 +143,6 @@ func (aws *AWS) buildPopulatedPlan(plan install.Plan) (*install.Plan, error) {
 		}
 		plan.Ingress = install.OptionalNodeGroup(nodeGroupFromSlices(tfNodes.IPs, tfNodes.InternalIPs, tfNodes.Hosts))
 	}
-	plan.Ingress = install.OptionalNodeGroup(nodeGroupFromSlices(tfNodes.IPs, tfNodes.InternalIPs, tfNodes.Hosts))
 
 	// Storage
 	if plan.Storage.ExpectedCount > 0 {
@@ -153,7 +152,6 @@ func (aws *AWS) buildPopulatedPlan(plan install.Plan) (*install.Plan, error) {
 		}
 		plan.Storage = install.OptionalNodeGroup(nodeGroupFromSlices(tfNodes.IPs, tfNodes.InternalIPs, tfNodes.Hosts))
 	}
-	plan.Storage = install.OptionalNodeGroup(nodeGroupFromSlices(tfNodes.IPs, tfNodes.InternalIPs, tfNodes.Hosts))
 
 	// SSH
 	plan.Cluster.SSH.User = "ubuntu"
