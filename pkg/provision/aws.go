@@ -89,11 +89,12 @@ func (aws AWS) Provision(plan install.Plan) (*install.Plan, error) {
 
 	// Terraform apply
 	applyCmd := exec.Command(aws.BinaryPath, "apply", plan.Cluster.Name)
+	applyCmd.Stdout = aws.Terraform.Output
+	applyCmd.Stderr = aws.Terraform.Output
 	applyCmd.Env = cmdEnv
 	applyCmd.Dir = cmdDir
-	if out, err := applyCmd.CombinedOutput(); err != nil {
-		fmt.Fprintln(aws.Output, string(out))
-		return nil, fmt.Errorf("Error running terraform apply: %s", out)
+	if err := applyCmd.Run(); err != nil {
+		return nil, fmt.Errorf("Error running terraform apply: %s", err)
 	}
 
 	// Update plan
