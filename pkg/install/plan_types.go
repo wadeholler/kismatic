@@ -468,14 +468,7 @@ type NodeGroup struct {
 }
 
 // An OptionalNodeGroup is a collection of nodes that can be empty
-type OptionalNodeGroup struct {
-	// Number of nodes.
-	// +required
-	ExpectedCount int `yaml:"expected_count"`
-	// List of nodes.
-	// +required
-	Nodes []Node
-}
+type OptionalNodeGroup NodeGroup
 
 // A Node is a compute unit, virtual or physical, that is part of the cluster
 type Node struct {

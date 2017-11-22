@@ -48,11 +48,11 @@ func (aws AWS) Provision(plan install.Plan) (*install.Plan, error) {
 	data := AWSTerraformData{
 		Region:            plan.Provisioner.AWSOptions.Region,
 		ClusterName:       plan.Cluster.Name,
-		MasterCount:       len(plan.Master.Nodes),
-		EtcdCount:         len(plan.Etcd.Nodes),
-		WorkerCount:       len(plan.Worker.Nodes),
-		IngressCount:      len(plan.Ingress.Nodes),
-		StorageCount:      len(plan.Storage.Nodes),
+		MasterCount:       plan.Master.ExpectedCount,
+		EtcdCount:         plan.Etcd.ExpectedCount,
+		WorkerCount:       plan.Worker.ExpectedCount,
+		IngressCount:      plan.Ingress.ExpectedCount,
+		StorageCount:      plan.Storage.ExpectedCount,
 		PrivateSSHKeyPath: privKeyPath,
 		PublicSSHKeyPath:  pubKeyPath,
 	}
@@ -113,7 +113,7 @@ func (aws *AWS) buildPopulatedPlan(plan install.Plan) (*install.Plan, error) {
 		ExpectedCount: masterNodes.ExpectedCount,
 		Nodes:         masterNodes.Nodes,
 	}
-	mng.LoadBalancedFQDN = tfNodes.InternalIPs[0]
+	mng.LoadBalancedFQDN = tfNodes.IPs[0]
 	mng.LoadBalancedShortName = tfNodes.IPs[0]
 	plan.Master = mng
 

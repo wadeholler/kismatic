@@ -19,7 +19,7 @@ func NewCmdPlan(in io.Reader, out io.Writer, options *installOpts) *cobra.Comman
 			if len(args) != 0 {
 				return fmt.Errorf("Unexpected args: %v", args)
 			}
-			planner := &install.FilePlanner{File: options.planFilename}
+			planner := install.FilePlanner{File: options.planFilename}
 			return doPlan(in, out, planner)
 		},
 	}
@@ -27,7 +27,7 @@ func NewCmdPlan(in io.Reader, out io.Writer, options *installOpts) *cobra.Comman
 	return cmd
 }
 
-func doPlan(in io.Reader, out io.Writer, planner *install.FilePlanner) error {
+func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner) error {
 	fmt.Fprintln(out, "Plan your Kubernetes cluster:")
 
 	name, err := util.PromptForAnyString(in, out, "Cluster name (must be unique)", "kismatic-cluster")
@@ -42,7 +42,7 @@ func doPlan(in io.Reader, out io.Writer, planner *install.FilePlanner) error {
 	//This is provider specific, otherwise != "" would be fine.
 	switch provisioner {
 	case "aws":
-		fmt.Fprintln(out, "Please make sure you have AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY. The provisioner validation will fail if they are not.")
+		fmt.Fprintln(out, "Set AWS_ACCESS_KEY and AWS_SECRET_ACCESS_KEY prior to running, otherwise provisioner validation will fail.")
 	}
 	etcdNodes, err := util.PromptForInt(in, out, "Number of etcd nodes", 3)
 	if err != nil {
@@ -123,7 +123,7 @@ func doPlan(in io.Reader, out io.Writer, planner *install.FilePlanner) error {
 		}
 		planner.File = fmt.Sprintf("%s/%s.yaml", dir, planTemplate.ClusterName)
 	}
-	if err = install.WritePlanTemplate(planTemplate, planner); err != nil {
+	if err = install.WritePlanTemplate(planTemplate, &planner); err != nil {
 		return fmt.Errorf("error planning installation: %v", err)
 	}
 	fmt.Fprintf(out, "Wrote plan file template to %q\n", planner.File)
