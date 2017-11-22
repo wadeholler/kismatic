@@ -33,7 +33,13 @@ func NewCmdProvision(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comm
 			}
 			switch plan.Provisioner.Provider {
 			case "aws":
-				aws := provision.AWS{Terraform: tf}
+				access := os.Getenv("AWS_ACCESS_KEY_ID")
+				secret := os.Getenv("AWS_SECRET_ACCESS_KEY")
+				aws := provision.AWS{
+					Terraform:       tf,
+					AccessKeyID:     access,
+					SecretAccessKey: secret,
+				}
 				updatedPlan, err := aws.Provision(*plan)
 				if err != nil {
 					return err
@@ -70,10 +76,15 @@ func NewCmdDestroy(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comman
 				Output:     out,
 				BinaryPath: filepath.Join(path, "terraform/bin/terraform"),
 			}
-			fmt.Println(plan.Provisioner.Provider)
 			switch plan.Provisioner.Provider {
 			case "aws":
-				aws := provision.AWS{Terraform: tf}
+				access := os.Getenv("AWS_ACCESS_KEY_ID")
+				secret := os.Getenv("AWS_SECRET_ACCESS_KEY")
+				aws := provision.AWS{
+					Terraform:       tf,
+					AccessKeyID:     access,
+					SecretAccessKey: secret,
+				}
 				return aws.Destroy(plan.Cluster.Name)
 			default:
 				return fmt.Errorf("provider %s not yet supported", plan.Provisioner.Provider)

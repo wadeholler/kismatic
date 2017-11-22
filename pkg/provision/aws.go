@@ -22,13 +22,16 @@ func (aws AWS) getCommandEnvironment() []string {
 // Provision the necessary infrastructure as described in the plan
 func (aws AWS) Provision(plan install.Plan) (*install.Plan, error) {
 	// Create directory for keeping cluster state
-	clusterStateDir := aws.getClusterStateDir(plan.Cluster.Name)
+	clusterStateDir, err := aws.getClusterStateDir(plan.Cluster.Name)
+	if err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(clusterStateDir, 0700); err != nil {
 		return nil, fmt.Errorf("error creating directory to keep cluster state: %v", err)
 	}
 
 	// Setup the environment for all Terraform commands.
-	cmdEnv := append(os.Environ(), aws.getCommandEnvironment()...)
+	cmdEnv := aws.getCommandEnvironment()
 	cmdDir := clusterStateDir
 	providerDir := fmt.Sprintf("../../providers/%s", plan.Provisioner.Provider)
 
@@ -162,7 +165,12 @@ func (aws AWS) Destroy(clusterName string) error {
 	cmd.Stdout = aws.Terraform.Output
 	cmd.Stderr = aws.Terraform.Output
 	cmd.Env = aws.getCommandEnvironment()
-	cmd.Dir = aws.getClusterStateDir(clusterName)
+	fmt.Println(cmd.Env)
+	dir, err := aws.getClusterStateDir(clusterName)
+	cmd.Dir = dir
+	if err != nil {
+		return err
+	}
 	if err := cmd.Run(); err != nil {
 		return errors.New("Error destroying infrastructure with Terraform")
 	}

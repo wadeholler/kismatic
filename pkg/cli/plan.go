@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/util"
@@ -113,15 +112,6 @@ func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner) error {
 		IngressNodes:              ingressNodes,
 		StorageNodes:              storageNodes,
 		NFSVolumes:                nfsVolumes,
-	}
-	if provisioner != "" {
-		//If a provider is given,
-		//write to the terraform state location
-		dir := fmt.Sprintf("terraform/clusters/%s", planTemplate.ClusterName)
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return fmt.Errorf("unable to create provisioner dir: %v", err)
-		}
-		planner.File = fmt.Sprintf("%s/%s.yaml", dir, planTemplate.ClusterName)
 	}
 	if err = install.WritePlanTemplate(planTemplate, &planner); err != nil {
 		return fmt.Errorf("error planning installation: %v", err)

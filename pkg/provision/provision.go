@@ -110,6 +110,10 @@ func (tf Terraform) getTerraformNodes(clusterName, role string) (*tfNodeGroup, e
 	return nodes, nil
 }
 
-func (t Terraform) getClusterStateDir(clusterName string) string {
-	return fmt.Sprintf("terraform/clusters/%s/", clusterName)
+func (tf Terraform) getClusterStateDir(clusterName string) (string, error) {
+	path, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(path, "terraform", "clusters", clusterName), nil
 }
