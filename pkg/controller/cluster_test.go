@@ -121,11 +121,29 @@ func TestClusterControllerTriggeredByWatch(t *testing.T) {
 	go c.Run(ctx)
 
 	// Create a new cluster in the store
-	cluster := store.Cluster{CurrentState: planned, DesiredState: installed, CanContinue: true}
-	err = clusterStore.Put(clusterName, cluster)
-	if err != nil {
-		t.Fatalf("error storing cluster")
-	}
+	// We don't have a way to reliably wait until the controller is watching,
+	// so we have to issue multiple writes
+	writerDone := make(chan struct{})
+	go func(done <-chan struct{}) {
+		cluster := store.Cluster{CurrentState: planned, DesiredState: installed, CanContinue: true}
+		err = clusterStore.Put(clusterName, cluster)
+		if err != nil {
+			t.Fatalf("error storing cluster")
+		}
+		tick := time.Tick(1 * time.Second)
+		for {
+			select {
+			case <-tick:
+				cluster := store.Cluster{CurrentState: planned, DesiredState: installed, CanContinue: true}
+				err = clusterStore.Put(clusterName, cluster)
+				if err != nil {
+					t.Fatalf("error storing cluster")
+				}
+			case <-done:
+				return
+			}
+		}
+	}(writerDone)
 
 	// Assert that the cluster reaches desired state
 	var done bool
@@ -143,12 +161,14 @@ func TestClusterControllerTriggeredByWatch(t *testing.T) {
 			}
 			if cluster.CurrentState == cluster.DesiredState {
 				cancel()
+				close(writerDone)
 				done = true
 				break
 			}
 		case <-time.After(5 * time.Second):
 			fmt.Println("tick")
 			cancel()
+			close(writerDone)
 			t.Errorf("did not reach installed state")
 			done = true
 			break

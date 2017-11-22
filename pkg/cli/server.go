@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -114,7 +115,8 @@ func doServer(stdout io.Writer, options serverOptions) error {
 
 	// Setup provisioner
 	terraform := provision.Terraform{
-		BinaryPath: "./../../bin/terraform",
+		Output:     os.Stdout,
+		BinaryPath: filepath.Join(pwd, "terraform/bin/terraform"),
 	}
 
 	ctrl := controller.New(

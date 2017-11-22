@@ -70,12 +70,13 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 					continue
 				}
 				cc := clusterController{
+					clusterName:    clusterName,
 					log:            mcc.log,
 					executor:       executor,
 					clusterStore:   mcc.clusterStore,
 					newProvisioner: mcc.provisionerCreator,
 				}
-				go cc.run(clusterName, newChan)
+				go cc.run(newChan)
 			}
 
 			var cluster store.Cluster
@@ -111,20 +112,22 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 						continue
 					}
 					cc := clusterController{
+						clusterName:    clusterName,
 						log:            mcc.log,
 						executor:       executor,
 						clusterStore:   mcc.clusterStore,
 						newProvisioner: mcc.provisionerCreator,
 					}
-					go cc.run(clusterName, newChan)
+					go cc.run(newChan)
 				}
 			}
 
-			// Remove any lingering workers if we have them
+			// Remove lingering cluster controllers, if any
 			for clusterName, ch := range mcc.clusterControllers {
 				_, found := definedClusters[clusterName]
 				if !found {
 					close(ch)
+					delete(mcc.clusterControllers, clusterName)
 				}
 			}
 

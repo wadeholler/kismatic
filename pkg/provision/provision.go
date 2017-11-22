@@ -42,15 +42,7 @@ type tfOutputVar struct {
 // a given cluster.
 type Provisioner interface {
 	Provision(install.Plan) (*install.Plan, error)
-	Destroy(string) error
-}
-
-// Creates a new terraform struct with specified logger.
-func NewTerraform(logger *log.Logger) *Terraform {
-	tf := &Terraform{}
-	tf.BinaryPath = terraformBinaryPath
-	tf.Logger = logger
-	return tf
+	Destroy(clusterName string) error
 }
 
 func (tf Terraform) getTerraformNodes(clusterName, role string) (*tfNodeGroup, error) {
