@@ -176,10 +176,8 @@ func seedImage(stdout, stderr io.Writer, img image, registry string, verbose boo
 		return err
 	}
 	// push
-	if err := runDockerCmd("push", privateImgTag); err != nil {
-		return err
-	}
-	return nil
+	return runDockerCmd("push", privateImgTag)
+
 }
 
 func readImageManifest() (imageManifest, error) {

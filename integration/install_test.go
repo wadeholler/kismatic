@@ -39,6 +39,8 @@ var _ = Describe("kismatic", func() {
 				Expect(helperr).To(BeNil())
 				helpText := string(helpbytes)
 				Expect(helpText).To(ContainSubstring("Generating installation plan file template"))
+				Expect(helpText).To(ContainSubstring("kismatic-cluster cluster name"))
+				Expect(helpText).To(ContainSubstring("infrastructure provisioner"))
 				Expect(helpText).To(ContainSubstring("3 etcd nodes"))
 				Expect(helpText).To(ContainSubstring("2 master nodes"))
 				Expect(helpText).To(ContainSubstring("3 worker nodes"))

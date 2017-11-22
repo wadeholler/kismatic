@@ -18,17 +18,31 @@ func NewCmdPlan(in io.Reader, out io.Writer, options *installOpts) *cobra.Comman
 			if len(args) != 0 {
 				return fmt.Errorf("Unexpected args: %v", args)
 			}
-			planner := &install.FilePlanner{File: options.planFilename}
-			return doPlan(in, out, planner, options.planFilename)
+			planner := install.FilePlanner{File: options.planFilename}
+			return doPlan(in, out, planner)
 		},
 	}
 
 	return cmd
 }
 
-func doPlan(in io.Reader, out io.Writer, planner install.Planner, planFile string) error {
+func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner) error {
 	fmt.Fprintln(out, "Plan your Kubernetes cluster:")
 
+	name, err := util.PromptForAnyString(in, out, "Cluster name (must be unique)", "kismatic-cluster")
+	if err != nil {
+		return fmt.Errorf("Error setting infrastructure provisioner: %v", err)
+	}
+	provisioner, err := util.PromptForString(in, out, "Infrastructure provider (optional, leave blank if nodes are already provisioned)", "", install.InfrastructureProviders())
+	if err != nil {
+		return fmt.Errorf("Error setting infrastructure provisioner: %v", err)
+	}
+
+	//This is provider specific, otherwise != "" would be fine.
+	switch provisioner {
+	case "aws":
+		fmt.Fprintln(out, "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY prior to running, otherwise provisioner validation will fail.")
+	}
 	etcdNodes, err := util.PromptForInt(in, out, "Number of etcd nodes", 3)
 	if err != nil {
 		return fmt.Errorf("Error reading number of etcd nodes: %v", err)
@@ -79,6 +93,8 @@ func doPlan(in io.Reader, out io.Writer, planner install.Planner, planFile strin
 
 	fmt.Fprintln(out)
 	fmt.Fprintf(out, "Generating installation plan file template with: \n")
+	fmt.Fprintf(out, "- %s cluster name\n", name)
+	fmt.Fprintf(out, "- %s infrastructure provisioner\n", provisioner)
 	fmt.Fprintf(out, "- %d etcd nodes\n", etcdNodes)
 	fmt.Fprintf(out, "- %d master nodes\n", masterNodes)
 	fmt.Fprintf(out, "- %d worker nodes\n", workerNodes)
@@ -88,17 +104,19 @@ func doPlan(in io.Reader, out io.Writer, planner install.Planner, planFile strin
 	fmt.Fprintln(out)
 
 	planTemplate := install.PlanTemplateOptions{
-		EtcdNodes:    etcdNodes,
-		MasterNodes:  masterNodes,
-		WorkerNodes:  workerNodes,
-		IngressNodes: ingressNodes,
-		StorageNodes: storageNodes,
-		NFSVolumes:   nfsVolumes,
+		ClusterName:               name,
+		InfrastructureProvisioner: provisioner,
+		EtcdNodes:                 etcdNodes,
+		MasterNodes:               masterNodes,
+		WorkerNodes:               workerNodes,
+		IngressNodes:              ingressNodes,
+		StorageNodes:              storageNodes,
+		NFSVolumes:                nfsVolumes,
 	}
-	if err = install.WritePlanTemplate(planTemplate, planner); err != nil {
+	if err = install.WritePlanTemplate(planTemplate, &planner); err != nil {
 		return fmt.Errorf("error planning installation: %v", err)
 	}
-	fmt.Fprintf(out, "Wrote plan file template to %q\n", planFile)
+	fmt.Fprintf(out, "Wrote plan file template to %q\n", planner.File)
 	fmt.Fprintf(out, "Edit the plan file to further describe your cluster. Once ready, execute the \"install validate\" command to proceed.\n")
 	return nil
 }

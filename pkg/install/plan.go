@@ -9,14 +9,12 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/apprenda/kismatic/pkg/util"
 	garbler "github.com/michaelbironneau/garbler/lib"
-	homedir "github.com/mitchellh/go-homedir"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -29,13 +27,15 @@ const (
 // PlanTemplateOptions contains the options that are desired when generating
 // a plan file template.
 type PlanTemplateOptions struct {
-	EtcdNodes     int
-	MasterNodes   int
-	WorkerNodes   int
-	IngressNodes  int
-	StorageNodes  int
-	NFSVolumes    int
-	AdminPassword string
+	ClusterName               string
+	InfrastructureProvisioner string
+	EtcdNodes                 int
+	MasterNodes               int
+	WorkerNodes               int
+	IngressNodes              int
+	StorageNodes              int
+	NFSVolumes                int
+	AdminPassword             string
 }
 
 // PlanReadWriter is capable of reading/writing a Plan
@@ -297,14 +297,21 @@ func WritePlanTemplate(planTemplateOpts PlanTemplateOptions, w PlanReadWriter) e
 // template options
 func buildPlanFromTemplateOptions(templateOpts PlanTemplateOptions) Plan {
 	p := Plan{}
-	p.Cluster.Name = "kubernetes"
+	p.Provisioner.Provider = templateOpts.InfrastructureProvisioner
+	// set provisioner's provider specific options
+	switch templateOpts.InfrastructureProvisioner {
+	case "aws":
+		p.Provisioner.AWSOptions = &AWSProvisionerOptions{}
+	}
+
+	p.Cluster.Name = templateOpts.ClusterName
 	p.Cluster.AdminPassword = templateOpts.AdminPassword
 	p.Cluster.DisablePackageInstallation = false
 	p.Cluster.DisconnectedInstallation = false
 
 	// Set SSH defaults
-	p.Cluster.SSH.User = "kismaticuser"
-	p.Cluster.SSH.Key = sshKey()
+	p.Cluster.SSH.User = ""
+	p.Cluster.SSH.Key = ""
 	p.Cluster.SSH.Port = 22
 
 	// Set Networking defaults
@@ -413,16 +420,6 @@ func generateAlphaNumericPassword() (string, error) {
 		}
 		attempts++
 	}
-}
-
-func sshKey() string {
-	key := "kismaticuser.key"
-	home, err := homedir.Dir()
-	// fallback to returning just the key
-	if err != nil {
-		return key
-	}
-	return filepath.Join(home, ".ssh", key)
 }
 
 // The comment map contains is keyed by the value that should be commented

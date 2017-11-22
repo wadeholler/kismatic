@@ -27,7 +27,7 @@ data "aws_ami" "ubuntu" {
 
 resource "aws_key_pair" "kismatic" {
   key_name   = "${var.cluster_name}"
-  public_key = "${var.public_ssh_key}"
+  public_key = "${file("${var.public_ssh_key_path}")}"
 }
 
 resource "aws_vpc" "kismatic" {
@@ -35,14 +35,14 @@ resource "aws_vpc" "kismatic" {
   enable_dns_support    = true
   enable_dns_hostnames  = true
   tags {
-    Name = "kismatic"
+    Name = "kismatic - cluster"
   }
 }
 
 resource "aws_internet_gateway" "kismatic_gateway" {
   vpc_id = "${aws_vpc.kismatic.id}"
   tags {
-    Name = "kismatic"
+    Name = "kismatic - cluster"
   }
 }
 
@@ -55,7 +55,7 @@ resource "aws_default_route_table" "kismatic_router" {
   }
 
   tags {
-    Name = "kismatic"
+    Name = "kismatic - cluster"
   }
 }
 
@@ -136,6 +136,7 @@ resource "aws_instance" "master" {
         type = "ssh"
         user = "ubuntu"
         private_key = "${file("${var.private_ssh_key_path}")}"
+        timeout = "2m"
       }
     }
 }
@@ -158,6 +159,7 @@ resource "aws_instance" "etcd" {
         type = "ssh"
         user = "ubuntu"
         private_key = "${file("${var.private_ssh_key_path}")}"
+        timeout = "2m"
       }
     }
 }
@@ -180,6 +182,7 @@ resource "aws_instance" "worker" {
         type = "ssh"
         user = "ubuntu"
         private_key = "${file("${var.private_ssh_key_path}")}"
+        timeout = "2m"
       }
     }
 }
@@ -202,6 +205,7 @@ resource "aws_instance" "ingress" {
         type = "ssh"
         user = "ubuntu"
         private_key = "${file("${var.private_ssh_key_path}")}"
+        timeout = "2m"
       }
     }
 }
@@ -224,29 +228,7 @@ resource "aws_instance" "storage" {
         type = "ssh"
         user = "ubuntu"
         private_key = "${file("${var.private_ssh_key_path}")}"
+        timeout = "2m"
       }
     }
-}
-
-
-data "template_file" "kismatic_cluster" {
-  template = "${file("${path.module}/../../clusters/${var.cluster_name}/kismatic-cluster.yaml.tpl")}"
-  vars {
-    etcd_pub_ip = "${aws_instance.etcd.0.public_ip}"
-    master_pub_ip = "${aws_instance.master.0.public_ip}"
-    worker_pub_ip = "${aws_instance.worker.0.public_ip}"
-    ingress_pub_ip = "${aws_instance.ingress.0.public_ip}"
-
-    etcd_priv_ip = "${aws_instance.etcd.0.private_ip}"
-    master_priv_ip = "${aws_instance.master.0.private_ip}"
-    worker_priv_ip = "${aws_instance.worker.0.private_ip}"
-    ingress_priv_ip = "${aws_instance.ingress.0.private_ip}"
-       
-    etcd_host = "${aws_instance.etcd.0.private_dns}"
-    master_host = "${aws_instance.master.0.private_dns}"
-    worker_host = "${aws_instance.worker.0.private_dns}"
-    ingress_host = "${aws_instance.ingress.0.private_dns}"
-
-    ssh_key = "${var.private_ssh_key_path}"
-  }
 }

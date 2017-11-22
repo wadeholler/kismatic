@@ -3,6 +3,7 @@
 * [provisioner](#provisioner)
   * [provider](#provisionerprovider)
   * [options](#provisioneroptions)
+    * [region](#provisioneroptionsregion)
 * [cluster](#cluster)
   * [name](#clustername)
   * [admin_password](#clusteradmin_password)
@@ -151,6 +152,16 @@
 ###  provisioner.options
 
  AWS specific options. Only set if using "aws" provider 
+
+###  provisioner.options.region
+
+ The AWS region to deploy in 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  Yes |
+| **Default** | ` ` | 
 
 ##  cluster
 
