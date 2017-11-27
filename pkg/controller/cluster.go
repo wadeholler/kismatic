@@ -19,38 +19,55 @@ const (
 	modifying       = "modifying"
 	modifyFailed    = "modifyFailed"
 	destroying      = "destroying"
+	destroyFailed   = "destroyFailed"
 	destroyed       = "destroyed"
 )
 
 // The clusterController manages the lifecycle of a single cluster.
 type clusterController struct {
+	clusterName    string
 	log            *log.Logger
 	executor       install.Executor
 	newProvisioner func(store.Cluster) provision.Provisioner
 	clusterStore   store.ClusterStore
 }
 
-func (c *clusterController) run(clusterName string, watch <-chan struct{}) {
-	c.log.Println("started controller")
+func (c *clusterController) run(watch <-chan struct{}) {
+	c.log.Printf("started controller for cluster %q", c.clusterName)
 	for _ = range watch {
-		c.log.Printf("got notification for cluster %q", clusterName)
-		cluster, err := c.clusterStore.Get(clusterName)
+		c.log.Printf("got notification for cluster %q", c.clusterName)
+		cluster, err := c.clusterStore.Get(c.clusterName)
 		if err != nil {
 			c.log.Printf("error getting cluster from store: %v", err)
 			continue
 		}
-		c.reconcile(clusterName, *cluster)
+		c.reconcile(*cluster)
+
+		// If the cluster has been destroyed, remove the cluster from the store
+		// and stop the controller
+		if cluster.CurrentState == destroyed {
+			err := c.clusterStore.Delete(c.clusterName)
+			if err != nil {
+				// At this point, the cluster has already been destroyed, but we
+				// failed to remove the cluster resource from the database. The
+				// only thing that can be done is for the user to issue another
+				// delete so that we try again.
+				c.log.Printf("could not delete cluster %q from store: %v", c.clusterName, err)
+				continue
+			}
+			c.log.Printf("cluster %q has been destroyed. stoppping controller.", c.clusterName)
+			return
+		}
 	}
-	c.log.Printf("stopping controller that was managing cluster %q", clusterName)
+	c.log.Printf("stopping controller that was managing cluster %q", c.clusterName)
 }
 
 // reconcile the cluster / take it to the desired state
-func (c *clusterController) reconcile(clusterName string, cluster store.Cluster) {
-	c.log.Println("current state is:", cluster.CurrentState, "desired state is:", cluster.DesiredState)
+func (c *clusterController) reconcile(cluster store.Cluster) {
 	for cluster.CurrentState != cluster.DesiredState && cluster.CanContinue {
 		// transition cluster and update its state in the store
 		cluster = c.transition(cluster)
-		err := c.clusterStore.Put(clusterName, cluster)
+		err := c.clusterStore.Put(c.clusterName, cluster)
 		if err != nil {
 			c.log.Printf("error storing cluster state: %v. The cluster's current state is %q and desired state is %q", err, cluster.CurrentState, cluster.DesiredState)
 			break
@@ -58,7 +75,7 @@ func (c *clusterController) reconcile(clusterName string, cluster store.Cluster)
 	}
 
 	if cluster.CurrentState == cluster.DesiredState {
-		c.log.Printf("cluster %q reached desired state %q", clusterName, cluster.DesiredState)
+		c.log.Printf("cluster %q reached desired state %q", c.clusterName, cluster.DesiredState)
 	}
 }
 
@@ -101,23 +118,31 @@ func (c *clusterController) transition(cluster store.Cluster) store.Cluster {
 		}
 		cluster.CurrentState = installing
 		return cluster
+	case installed:
+		if cluster.DesiredState == destroyed {
+			cluster.CurrentState = destroying
+			return cluster
+		}
+		c.log.Printf("cluster %q: cannot transition to %q from the 'installed' state", c.clusterName, cluster.DesiredState)
+		cluster.CanContinue = false
+		return cluster
 	default:
 		// Log a message, and set CanContinue to false so that we don't get
 		// stuck in an infinte loop. The only thing the user can do in this case
 		// is delete the cluster and file a bug, as this scenario should not
 		// happen.
-		c.log.Printf("the desired state is %q, but there is no transition defined for the cluster's current state %q", cluster.DesiredState, cluster.CurrentState)
+		c.log.Printf("cluster %q: the desired state is %q, but there is no transition defined for the cluster's current state %q", c.clusterName, cluster.DesiredState, cluster.CurrentState)
 		cluster.CanContinue = false
 		return cluster
 	}
 }
 
 func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
-	c.log.Println("provisioning infrastructure for cluster")
+	c.log.Printf("provisioning infrastructure for cluster %q", c.clusterName)
 	provisioner := c.newProvisioner(cluster)
 	updatedPlan, err := provisioner.Provision(cluster.Plan)
 	if err != nil {
-		c.log.Printf("error provisioning: %v", err)
+		c.log.Printf("error provisioning infrastructure for cluster %q: %v", c.clusterName, err)
 		cluster.CurrentState = provisionFailed
 		cluster.CanContinue = false
 		return cluster
@@ -128,17 +153,26 @@ func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
 }
 
 func (c *clusterController) destroy(cluster store.Cluster) store.Cluster {
-	c.log.Println("destroying cluster")
+	c.log.Printf("destroying cluster %q", c.clusterName)
+	provisioner := c.newProvisioner(cluster)
+	err := provisioner.Destroy(cluster.Plan.Cluster.Name)
+	if err != nil {
+		c.log.Printf("error destroying cluster %q: %v", c.clusterName, err)
+		cluster.CurrentState = destroyFailed
+		cluster.CanContinue = false
+		return cluster
+	}
+	cluster.CurrentState = destroyed
 	return cluster
 }
 
 func (c *clusterController) install(cluster store.Cluster) store.Cluster {
-	c.log.Println("installing cluster")
+	c.log.Printf("installing cluster %q", c.clusterName)
 	plan := cluster.Plan
 
 	err := c.executor.RunPreFlightCheck(&plan)
 	if err != nil {
-		c.log.Printf("error running preflight checks: %v", err)
+		c.log.Printf("cluster %q: error running preflight checks: %v", c.clusterName, err)
 		cluster.CurrentState = installFailed
 		cluster.CanContinue = false
 		return cluster
@@ -146,7 +180,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 
 	err = c.executor.GenerateCertificates(&plan, false)
 	if err != nil {
-		c.log.Printf("error generating certificates: %v", err)
+		c.log.Printf("cluster %q: error generating certificates: %v", c.clusterName, err)
 		cluster.CurrentState = installFailed
 		cluster.CanContinue = false
 		return cluster
@@ -154,7 +188,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 
 	err = c.executor.GenerateKubeconfig(plan)
 	if err != nil {
-		c.log.Printf("error generating kubeconfig file: %v", err)
+		c.log.Printf("cluster %q: error generating kubeconfig file: %v", c.clusterName, err)
 		cluster.CurrentState = installFailed
 		cluster.CanContinue = false
 		return cluster
@@ -162,7 +196,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 
 	err = c.executor.Install(&plan, true)
 	if err != nil {
-		c.log.Printf("error installing the cluster: %v", err)
+		c.log.Printf("cluster %q: error installing the cluster: %v", c.clusterName, err)
 		cluster.CurrentState = installFailed
 		cluster.CanContinue = false
 		return cluster
@@ -177,7 +211,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 
 	err = c.executor.RunSmokeTest(&plan)
 	if err != nil {
-		c.log.Printf("error running smoke test against the cluster: %v", err)
+		c.log.Printf("cluster %q: error running smoke test against the cluster: %v", c.clusterName, err)
 		cluster.CurrentState = installFailed
 		return cluster
 	}

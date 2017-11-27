@@ -209,9 +209,9 @@ func (api Clusters) Get(w http.ResponseWriter, r *http.Request, p httprouter.Par
 		if err == ErrClusterNotFound {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
+			api.Logger.Println(errorf(err.Error()))
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		api.Logger.Println(errorf(err.Error()))
 		return
 	}
 
