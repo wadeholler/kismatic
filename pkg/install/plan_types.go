@@ -20,7 +20,7 @@ func InfrastructureProviders() []string {
 }
 
 func CompatibleOSes() []string {
-	return []string{"ubuntu", "centos"}
+	return []string{"ubuntu", "centos", ""}
 }
 
 func packageManagerProviders() []string {
