@@ -15,6 +15,7 @@ type AWSTerraformData struct {
 	PublicSSHKeyPath  string `json:"public_ssh_key_path"`
 	SSHUser           string `json:"ssh_user,omitempty"`
 	ClusterName       string `json:"cluster_name"`
+	ClusterOS         string `json:"cluster_os"`
 	ClusterOwner      string `json:"cluster_owner"`
 	MasterCount       int    `json:"master_count"`
 	EtcdCount         int    `json:"etcd_count"`

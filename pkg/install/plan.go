@@ -28,6 +28,7 @@ const (
 // a plan file template.
 type PlanTemplateOptions struct {
 	ClusterName               string
+	ClusterOS                 string
 	InfrastructureProvisioner string
 	EtcdNodes                 int
 	MasterNodes               int
@@ -314,7 +315,13 @@ func buildPlanFromTemplateOptions(templateOpts PlanTemplateOptions) Plan {
 	case "aws":
 		p.Provisioner.AWSOptions = &AWSProvisionerOptions{}
 	}
-
+	p.Provisioner.OS = templateOpts.ClusterOS
+	switch templateOpts.ClusterOS {
+	case "ubuntu":
+		p.Cluster.SSH.User = "ubuntu"
+	case "centos":
+		p.Cluster.SSH.User = "root"
+	}
 	// Set Networking defaults
 	p.Cluster.Networking.PodCIDRBlock = "172.16.0.0/16"
 	p.Cluster.Networking.ServiceCIDRBlock = "172.20.0.0/16"
