@@ -32,16 +32,49 @@ type clusterController struct {
 	clusterStore   store.ClusterStore
 }
 
+// This is the controller's reconciliation loop. It listens on a channel for
+// changes to the cluster spec. In the case of a mismatch between the current
+// state and the desired state, the controller will take action by transitioning
+// the cluster towards the desired state.
 func (c *clusterController) run(watch <-chan struct{}) {
 	c.log.Printf("started controller for cluster %q", c.clusterName)
 	for _ = range watch {
-		c.log.Printf("got notification for cluster %q", c.clusterName)
 		cluster, err := c.clusterStore.Get(c.clusterName)
 		if err != nil {
 			c.log.Printf("error getting cluster from store: %v", err)
 			continue
 		}
-		c.reconcile(*cluster)
+		c.log.Printf("cluster %q - current state: %s, desired state: %s, can continue: %v", c.clusterName, cluster.CurrentState, cluster.DesiredState, cluster.CanContinue)
+
+		// Don't do anything if we can't continue. This is the case when there
+		// has been a failure that we cannot recover from, and we are waiting
+		// for the user to take action.
+		if !cluster.CanContinue {
+			continue
+		}
+
+		// Transition the cluster to the next state
+		updatedCluster := c.transition(*cluster)
+
+		// Transitions are long - O(minutes). Get the latest cluster spec from
+		// the store before updating it.
+		// TODO: Ideally we would run this in a transaction, but the current
+		// implementation of the store does not expose txs.
+		cluster, err = c.clusterStore.Get(c.clusterName)
+		if err != nil {
+			c.log.Printf("error getting cluster from store: %v", err)
+			continue
+		}
+
+		// Update a subset of the fields in the cluster spec.
+		cluster.Plan = updatedCluster.Plan
+		cluster.CurrentState = updatedCluster.CurrentState
+		cluster.CanContinue = updatedCluster.CanContinue
+		err = c.clusterStore.Put(c.clusterName, *cluster)
+		if err != nil {
+			c.log.Printf("error storing cluster state: %v. The cluster's current state is %q and desired state is %q", err, cluster.CurrentState, cluster.DesiredState)
+			continue
+		}
 
 		// If the cluster has been destroyed, remove the cluster from the store
 		// and stop the controller
@@ -60,24 +93,6 @@ func (c *clusterController) run(watch <-chan struct{}) {
 		}
 	}
 	c.log.Printf("stopping controller that was managing cluster %q", c.clusterName)
-}
-
-// reconcile the cluster / take it to the desired state
-func (c *clusterController) reconcile(cluster store.Cluster) {
-	c.log.Printf("cluster %q - current state: %s, desired state: %s, can continue: %v", c.clusterName, cluster.CurrentState, cluster.DesiredState, cluster.CanContinue)
-	for cluster.CurrentState != cluster.DesiredState && cluster.CanContinue {
-		// transition cluster and update its state in the store
-		cluster = c.transition(cluster)
-		err := c.clusterStore.Put(c.clusterName, cluster)
-		if err != nil {
-			c.log.Printf("error storing cluster state: %v. The cluster's current state is %q and desired state is %q", err, cluster.CurrentState, cluster.DesiredState)
-			break
-		}
-	}
-
-	if cluster.CurrentState == cluster.DesiredState {
-		c.log.Printf("cluster %q reached desired state %q", c.clusterName, cluster.DesiredState)
-	}
 }
 
 // transition performs an action to take the cluster to the next state. The
