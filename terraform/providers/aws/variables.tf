@@ -2,6 +2,10 @@ variable "region" {
   default = "us-east-1"
 }
 
+variable "AZ" {
+  default = "us-east-1c"
+}
+
 variable "access_key" {
   default = ""
 }
@@ -20,7 +24,7 @@ variable "public_ssh_key_path" {
 }
 
 variable "ssh_user" {
-  default = "ubuntu"
+  default = ""
 }
 
 variable "version" {

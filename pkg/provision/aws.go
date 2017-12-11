@@ -46,6 +46,7 @@ func (aws AWS) Provision(plan install.Plan) (*install.Plan, error) {
 		return nil, fmt.Errorf("error generating SSH key pair: %v", err)
 	}
 	plan.Cluster.SSH.Key = privKeyPath
+	plan.Cluster.SSH.User = "ubuntu"
 
 	// Write out the terraform variables
 	data := AWSTerraformData{
@@ -120,17 +121,12 @@ func (aws *AWS) buildPopulatedPlan(plan install.Plan) (*install.Plan, error) {
 		ExpectedCount: masterNodes.ExpectedCount,
 		Nodes:         masterNodes.Nodes,
 	}
-	if mng.ExpectedCount > 1 {
-		mlb, err := aws.getLoadBalancer(plan.Cluster.Name, "master")
-		if err != nil {
-			return nil, err
-		}
-		mng.LoadBalancedFQDN = mlb
-		mng.LoadBalancedShortName = mlb
-	} else {
-		mng.LoadBalancedFQDN = mng.Nodes[0].IP
-		mng.LoadBalancedShortName = mng.Nodes[0].IP
+	mlb, err := aws.getLoadBalancer(plan.Cluster.Name, "master")
+	if err != nil {
+		return nil, err
 	}
+	mng.LoadBalancedFQDN = mlb
+	mng.LoadBalancedShortName = mlb
 	plan.Master = mng
 
 	// Etcds
@@ -165,8 +161,6 @@ func (aws *AWS) buildPopulatedPlan(plan install.Plan) (*install.Plan, error) {
 		plan.Storage = install.OptionalNodeGroup(nodeGroupFromSlices(tfNodes.IPs, tfNodes.InternalIPs, tfNodes.Hosts))
 	}
 
-	// SSH
-	plan.Cluster.SSH.User = "ubuntu"
 	return &plan, nil
 }
 
