@@ -194,7 +194,7 @@ func formatErrs(errs []error) []string {
 	return out
 }
 
-var validStates = []string{"installed"}
+var validStates = []string{"planned", "provisioned", "installed"}
 var validProvisionerProviders = []string{"aws"}
 
 func (api Clusters) Create(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -275,21 +275,23 @@ func (api Clusters) Update(w http.ResponseWriter, r *http.Request, p httprouter.
 		return
 	}
 
-	// patch the store with the request
-	updatedInStore, err := buildStoreCluster(req, fromStore.Plan.Cluster.AdminPassword)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		api.Logger.Println(errorf(err.Error()))
-		return
-	}
-	if err := putToStore(req.Name, *updatedInStore, api.Store); err != nil {
+	// Update the fields that can be updated
+	fromStore.DesiredState = req.DesiredState
+	fromStore.CanContinue = true
+	fromStore.ProvisionerCredentials.AWS.AccessKeyId = req.Provisioner.AWSOptions.AccessKeyID
+	fromStore.ProvisionerCredentials.AWS.SecretAccessKey = req.Provisioner.AWSOptions.SecretAccessKey
+	fromStore.Plan.Master.ExpectedCount = req.MasterCount
+	fromStore.Plan.Worker.ExpectedCount = req.WorkerCount
+	fromStore.Plan.Ingress.ExpectedCount = req.IngressCount
+
+	if err := putToStore(req.Name, *fromStore, api.Store); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		api.Logger.Println(errorf(err.Error()))
 		return
 	}
 
 	// respond with the updated request
-	clusterResp := buildResponse(id, *updatedInStore)
+	clusterResp := buildResponse(id, *fromStore)
 	bytes, err := json.MarshalIndent(clusterResp, "", "  ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

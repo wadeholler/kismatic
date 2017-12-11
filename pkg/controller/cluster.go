@@ -6,6 +6,7 @@ import (
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/provision"
 	"github.com/apprenda/kismatic/pkg/store"
+	"github.com/google/go-cmp/cmp"
 )
 
 const (
@@ -26,6 +27,7 @@ const (
 // The clusterController manages the lifecycle of a single cluster.
 type clusterController struct {
 	clusterName    string
+	clusterSpec    store.Cluster
 	log            *log.Logger
 	executor       install.Executor
 	newProvisioner func(store.Cluster) provision.Provisioner
@@ -46,10 +48,14 @@ func (c *clusterController) run(watch <-chan struct{}) {
 		}
 		c.log.Printf("cluster %q - current state: %s, desired state: %s, can continue: %v", c.clusterName, cluster.CurrentState, cluster.DesiredState, cluster.CanContinue)
 
-		// Don't do anything if we can't continue. This is the case when there
-		// has been a failure that we cannot recover from, and we are waiting
-		// for the user to take action.
-		if !cluster.CanContinue {
+		// If the plan has changed, set the current state to planned.
+		if !cmp.Equal(cluster.Plan, c.clusterSpec.Plan) {
+			cluster.CurrentState = planned
+		}
+
+		// If we have reached the desired state, don't do anything. Similarly,
+		// if we can't continue due to a failure, don't do anything.
+		if cluster.CurrentState == cluster.DesiredState || !cluster.CanContinue {
 			continue
 		}
 
@@ -76,6 +82,9 @@ func (c *clusterController) run(watch <-chan struct{}) {
 			continue
 		}
 
+		// Update the controller's state of the world to the latest state.
+		c.clusterSpec = *cluster
+
 		// If the cluster has been destroyed, remove the cluster from the store
 		// and stop the controller
 		if cluster.CurrentState == destroyed {
@@ -101,7 +110,7 @@ func (c *clusterController) run(watch <-chan struct{}) {
 // the outcome of the action.
 func (c *clusterController) transition(cluster store.Cluster) store.Cluster {
 	if cluster.CurrentState == cluster.DesiredState {
-		panic("cannot transition a cluster that is already at it's desired state")
+		return cluster
 	}
 	switch cluster.CurrentState {
 	case planned:
