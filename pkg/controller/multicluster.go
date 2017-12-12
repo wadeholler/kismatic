@@ -61,6 +61,13 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 			// Create a new controller if this is the first time we hear about
 			// this cluster
 			if !found {
+				var cluster store.Cluster
+				err := json.Unmarshal(resp.Value, &cluster)
+				if err != nil {
+					mcc.log.Printf("error unmarshaling watch event value for cluster %q: %v", clusterName, err)
+					continue
+				}
+
 				newChan := make(chan struct{}, clusterControllerNotificationBuffer)
 				ch = newChan
 				mcc.clusterControllers[clusterName] = newChan
@@ -71,19 +78,13 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 				}
 				cc := clusterController{
 					clusterName:    clusterName,
+					clusterSpec:    cluster,
 					log:            mcc.log,
 					executor:       executor,
 					clusterStore:   mcc.clusterStore,
 					newProvisioner: mcc.provisionerCreator,
 				}
 				go cc.run(newChan)
-			}
-
-			var cluster store.Cluster
-			err := json.Unmarshal(resp.Value, &cluster)
-			if err != nil {
-				mcc.log.Printf("error unmarshaling watch event value for cluster %q: %v", clusterName, err)
-				continue
 			}
 
 			// Don't block if the cluster controller's buffer is full.
@@ -101,7 +102,7 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 				continue
 			}
 			// Make sure we have workers for all the clusters that are defined in the store
-			for clusterName := range definedClusters {
+			for clusterName, cluster := range definedClusters {
 				_, found := mcc.clusterControllers[clusterName]
 				if !found {
 					newChan := make(chan struct{}, clusterControllerNotificationBuffer)
@@ -113,6 +114,7 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 					}
 					cc := clusterController{
 						clusterName:    clusterName,
+						clusterSpec:    cluster,
 						log:            mcc.log,
 						executor:       executor,
 						clusterStore:   mcc.clusterStore,
