@@ -125,7 +125,9 @@ func TestClusterControllerTriggeredByWatch(t *testing.T) {
 	writerDone := make(chan struct{})
 	defer func() { close(writerDone) }()
 	go func(done <-chan struct{}) {
-		cluster := store.Cluster{CurrentState: planned, DesiredState: installed, CanContinue: true}
+		cluster := store.Cluster{
+			Spec: store.ClusterSpec{DesiredState: installed},
+		}
 		err = clusterStore.Put(clusterName, cluster)
 		if err != nil {
 			t.Fatalf("error storing cluster")
@@ -163,7 +165,7 @@ done:
 			if err != nil {
 				t.Fatalf("error unmarshaling from store")
 			}
-			if cluster.CurrentState == cluster.DesiredState {
+			if cluster.Status.CurrentState == cluster.Spec.DesiredState {
 				break done
 			}
 		case <-time.After(5 * time.Second):
@@ -198,7 +200,9 @@ func TestClusterControllerReconciliationLoop(t *testing.T) {
 	// Create a new cluster in the store before starting the controller.
 	// The controller should pick it up in the reconciliation loop.
 	clusterName := "testCluster"
-	cluster := store.Cluster{CurrentState: planned, DesiredState: installed, CanContinue: true}
+	cluster := store.Cluster{
+		Spec: store.ClusterSpec{DesiredState: installed},
+	}
 	err = clusterStore.Put(clusterName, cluster)
 	if err != nil {
 		t.Fatalf("error storing cluster")
@@ -228,7 +232,7 @@ done:
 			if err != nil {
 				t.Fatalf("error unmarshaling from store")
 			}
-			if cluster.CurrentState == cluster.DesiredState {
+			if cluster.Status.CurrentState == cluster.Spec.DesiredState {
 				break done
 			}
 		case <-time.After(5 * time.Second):

@@ -76,16 +76,16 @@ func DefaultExecutorCreator(rootDir string) ExecutorCreator {
 // on the clouds we support.
 func DefaultProvisionerCreator(terraform provision.Terraform) ProvisionerCreator {
 	return func(cluster store.Cluster) provision.Provisioner {
-		switch cluster.Plan.Provisioner.Provider {
+		switch cluster.Spec.Provisioner.Provider {
 		case "aws":
 			p := provision.AWS{
-				AccessKeyID:     cluster.ProvisionerCredentials.AWS.AccessKeyId,
-				SecretAccessKey: cluster.ProvisionerCredentials.AWS.SecretAccessKey,
+				AccessKeyID:     cluster.Spec.Provisioner.Credentials.AWS.AccessKeyId,
+				SecretAccessKey: cluster.Spec.Provisioner.Credentials.AWS.SecretAccessKey,
 				Terraform:       terraform,
 			}
 			return p
 		default:
-			panic(fmt.Sprintf("provider not supported: %q", cluster.Plan.Provisioner.Provider))
+			panic(fmt.Sprintf("provider not supported: %q", cluster.Spec.Provisioner.Provider))
 		}
 	}
 }

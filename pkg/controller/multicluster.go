@@ -78,7 +78,7 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 				}
 				cc := clusterController{
 					clusterName:    clusterName,
-					clusterSpec:    cluster,
+					clusterSpec:    cluster.Spec,
 					log:            mcc.log,
 					executor:       executor,
 					clusterStore:   mcc.clusterStore,
@@ -114,7 +114,7 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 					}
 					cc := clusterController{
 						clusterName:    clusterName,
-						clusterSpec:    cluster,
+						clusterSpec:    cluster.Spec,
 						log:            mcc.log,
 						executor:       executor,
 						clusterStore:   mcc.clusterStore,
