@@ -3,6 +3,8 @@ package controller
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/provision"
@@ -29,15 +31,13 @@ const (
 
 // The clusterController manages the lifecycle of a single cluster.
 type clusterController struct {
-	clusterName string
-	clusterSpec store.ClusterSpec
-	// TODO: The plan is only stored in memory. If the controller goes down, it
-	// will be lost.
-	installPlan    install.Plan
-	log            *log.Logger
-	executor       install.Executor
-	newProvisioner func(store.Cluster) provision.Provisioner
-	clusterStore   store.ClusterStore
+	clusterName      string
+	clusterSpec      store.ClusterSpec
+	clusterAssetsDir string
+	log              *log.Logger
+	executor         install.Executor
+	newProvisioner   func(store.Cluster) provision.Provisioner
+	clusterStore     store.ClusterStore
 }
 
 // This is the controller's reconciliation loop. It listens on a channel for
@@ -181,29 +181,68 @@ func (c *clusterController) transition(cluster store.Cluster) store.Cluster {
 
 func (c *clusterController) plan(cluster store.Cluster) store.Cluster {
 	c.log.Printf("planning installation for cluster %q", c.clusterName)
-	plan, err := buildPlan(c.clusterName, cluster.Spec, c.installPlan.Cluster.AdminPassword)
+
+	// Create the assets dir if it does not exist
+	if err := os.MkdirAll(c.clusterAssetsDir, 0700); err != nil {
+		c.log.Printf("error creating the assets directory: %v", err)
+		cluster.Status.CurrentState = planningFailed
+		cluster.Status.WaitingForManualRetry = true
+		return cluster
+	}
+
+	// If a plan already exists, reuse the password instead of generating a new one.
+	var existingPassword string
+	fp := install.FilePlanner{File: c.planFilePath()}
+	if fp.PlanExists() {
+		p, err := fp.Read()
+		if err != nil {
+			c.log.Printf("error reading the existing plan for cluster %q: %v", c.clusterName, err)
+			cluster.Status.CurrentState = planningFailed
+			cluster.Status.WaitingForManualRetry = true
+			return cluster
+		}
+		existingPassword = p.Cluster.AdminPassword
+	}
+
+	err := writePlanFile(c.clusterName, fp, cluster.Spec, existingPassword)
 	if err != nil {
 		c.log.Printf("error planning installation for cluster %q: %v", c.clusterName, err)
 		cluster.Status.CurrentState = planningFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
-	c.installPlan = *plan
 	cluster.Status.CurrentState = planned
 	return cluster
+}
+
+func (c *clusterController) planFilePath() string {
+	return filepath.Join(c.clusterAssetsDir, "kismatic-cluster.yaml")
 }
 
 func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
 	c.log.Printf("provisioning infrastructure for cluster %q", c.clusterName)
 	provisioner := c.newProvisioner(cluster)
-	updatedPlan, err := provisioner.Provision(c.installPlan)
+	fp := install.FilePlanner{File: c.planFilePath()}
+	plan, err := fp.Read()
 	if err != nil {
 		c.log.Printf("error provisioning infrastructure for cluster %q: %v", c.clusterName, err)
 		cluster.Status.CurrentState = provisionFailed
 		cluster.Status.WaitingForManualRetry = true
 		return cluster
 	}
-	c.installPlan = *updatedPlan
+	updatedPlan, err := provisioner.Provision(*plan)
+	if err != nil {
+		c.log.Printf("error provisioning infrastructure for cluster %q: %v", c.clusterName, err)
+		cluster.Status.CurrentState = provisionFailed
+		cluster.Status.WaitingForManualRetry = true
+		return cluster
+	}
+	if err := fp.Write(updatedPlan); err != nil {
+		c.log.Printf("error writing updated plan file: %v", err)
+		cluster.Status.CurrentState = provisionFailed
+		cluster.Status.WaitingForManualRetry = true
+		return cluster
+	}
 	cluster.Status.CurrentState = provisioned
 	cluster.Status.ClusterIP = updatedPlan.Master.LoadBalancedFQDN
 	return cluster
@@ -225,9 +264,16 @@ func (c *clusterController) destroy(cluster store.Cluster) store.Cluster {
 
 func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	c.log.Printf("installing cluster %q", c.clusterName)
-	plan := c.installPlan
+	fp := install.FilePlanner{File: c.planFilePath()}
+	plan, err := fp.Read()
+	if err != nil {
+		c.log.Printf("cluster %q: error reading plan file: %v", c.clusterName, err)
+		cluster.Status.CurrentState = installFailed
+		cluster.Status.WaitingForManualRetry = true
+		return cluster
+	}
 
-	err := c.executor.RunPreFlightCheck(&plan)
+	err = c.executor.RunPreFlightCheck(plan)
 	if err != nil {
 		c.log.Printf("cluster %q: error running preflight checks: %v", c.clusterName, err)
 		cluster.Status.CurrentState = installFailed
@@ -235,7 +281,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 		return cluster
 	}
 
-	err = c.executor.GenerateCertificates(&plan, false)
+	err = c.executor.GenerateCertificates(plan, false)
 	if err != nil {
 		c.log.Printf("cluster %q: error generating certificates: %v", c.clusterName, err)
 		cluster.Status.CurrentState = installFailed
@@ -243,7 +289,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 		return cluster
 	}
 
-	err = c.executor.GenerateKubeconfig(plan)
+	err = c.executor.GenerateKubeconfig(*plan)
 	if err != nil {
 		c.log.Printf("cluster %q: error generating kubeconfig file: %v", c.clusterName, err)
 		cluster.Status.CurrentState = installFailed
@@ -251,7 +297,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 		return cluster
 	}
 
-	err = c.executor.Install(&plan, true)
+	err = c.executor.Install(plan, true)
 	if err != nil {
 		c.log.Printf("cluster %q: error installing the cluster: %v", c.clusterName, err)
 		cluster.Status.CurrentState = installFailed
@@ -266,7 +312,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 		return cluster
 	}
 
-	err = c.executor.RunSmokeTest(&plan)
+	err = c.executor.RunSmokeTest(plan)
 	if err != nil {
 		c.log.Printf("cluster %q: error running smoke test against the cluster: %v", c.clusterName, err)
 		cluster.Status.CurrentState = installFailed
@@ -277,8 +323,7 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	return cluster
 }
 
-func buildPlan(name string, clusterSpec store.ClusterSpec, existingPassword string) (*install.Plan, error) {
-	// Build the plan template
+func writePlanFile(clusterName string, filePlanner install.FilePlanner, clusterSpec store.ClusterSpec, existingPassword string) error {
 	planTemplate := install.PlanTemplateOptions{
 		AdminPassword: existingPassword,
 		EtcdNodes:     clusterSpec.EtcdCount,
@@ -288,18 +333,15 @@ func buildPlan(name string, clusterSpec store.ClusterSpec, existingPassword stri
 	}
 	planner := &install.BytesPlanner{}
 	if err := install.WritePlanTemplate(planTemplate, planner); err != nil {
-		return nil, fmt.Errorf("could not decode request body: %v", err)
+		return fmt.Errorf("could not write plan template: %v", err)
 	}
-	var p *install.Plan
 	p, err := planner.Read()
 	if err != nil {
-		return nil, fmt.Errorf("could not read plan: %v", err)
+		return fmt.Errorf("could not read plan: %v", err)
 	}
 	// Set values in the plan
-	p.Cluster.Name = name
+	p.Cluster.Name = clusterName
 	p.Provisioner = install.Provisioner{Provider: clusterSpec.Provisioner.Provider}
-
-	// Set values that depend on the cloud where the cluster will run
 	// TODO: Handle provisioner specific options (e.g. AWS Region)
 	switch clusterSpec.Provisioner.Provider {
 	case "aws":
@@ -308,5 +350,5 @@ func buildPlan(name string, clusterSpec store.ClusterSpec, existingPassword stri
 	case "azure":
 		p.AddOns.CNI.Provider = "weave"
 	}
-	return p, nil
+	return filePlanner.Write(p)
 }

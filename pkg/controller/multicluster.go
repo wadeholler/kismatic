@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"path/filepath"
 	"time"
 
 	"github.com/apprenda/kismatic/pkg/provision"
@@ -31,6 +32,7 @@ const clusterControllerNotificationBuffer = 10
 // When a cluster is deleted from the store, the corresponding worker is
 // terminated.
 type multiClusterController struct {
+	assetsRootDir      string
 	log                *log.Logger
 	newExecutor        ExecutorCreator
 	provisionerCreator func(store.Cluster) provision.Provisioner
@@ -71,18 +73,19 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 				newChan := make(chan struct{}, clusterControllerNotificationBuffer)
 				ch = newChan
 				mcc.clusterControllers[clusterName] = newChan
-				executor, err := mcc.newExecutor(clusterName)
+				executor, err := mcc.newExecutor(clusterName, mcc.assetsRootDir)
 				if err != nil {
 					mcc.log.Printf("error creating executor for new cluster: %v", err)
 					continue
 				}
 				cc := clusterController{
-					clusterName:    clusterName,
-					clusterSpec:    cluster.Spec,
-					log:            mcc.log,
-					executor:       executor,
-					clusterStore:   mcc.clusterStore,
-					newProvisioner: mcc.provisionerCreator,
+					clusterName:      clusterName,
+					clusterSpec:      cluster.Spec,
+					clusterAssetsDir: filepath.Join(mcc.assetsRootDir, clusterName),
+					log:              mcc.log,
+					executor:         executor,
+					clusterStore:     mcc.clusterStore,
+					newProvisioner:   mcc.provisionerCreator,
 				}
 				go cc.run(newChan)
 			}
@@ -107,18 +110,19 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 				if !found {
 					newChan := make(chan struct{}, clusterControllerNotificationBuffer)
 					mcc.clusterControllers[clusterName] = newChan
-					executor, err := mcc.newExecutor(clusterName)
+					executor, err := mcc.newExecutor(clusterName, mcc.assetsRootDir)
 					if err != nil {
 						mcc.log.Printf("error creating executor for new cluster: %v", err)
 						continue
 					}
 					cc := clusterController{
-						clusterName:    clusterName,
-						clusterSpec:    cluster.Spec,
-						log:            mcc.log,
-						executor:       executor,
-						clusterStore:   mcc.clusterStore,
-						newProvisioner: mcc.provisionerCreator,
+						clusterName:      clusterName,
+						clusterSpec:      cluster.Spec,
+						clusterAssetsDir: filepath.Join(mcc.assetsRootDir, clusterName),
+						log:              mcc.log,
+						executor:         executor,
+						clusterStore:     mcc.clusterStore,
+						newProvisioner:   mcc.provisionerCreator,
 					}
 					go cc.run(newChan)
 				}

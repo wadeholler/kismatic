@@ -91,7 +91,7 @@ func TestClusterControllerTriggeredByWatch(t *testing.T) {
 	logger := log.New(os.Stdout, "[cluster controller] ", log.Ldate|log.Ltime)
 
 	// Stub out dependencies
-	executorCreator := func(string) (install.Executor, error) { return dummyExec{}, nil }
+	executorCreator := func(string, string) (install.Executor, error) { return dummyExec{}, nil }
 
 	tmpFile, err := ioutil.TempFile("", "cluster-controller-tests")
 	if err != nil {
@@ -116,7 +116,11 @@ func TestClusterControllerTriggeredByWatch(t *testing.T) {
 	defer cancel()
 
 	clusterName := "testCluster"
-	c := New(logger, executorCreator, provisioner, clusterStore, 10*time.Minute)
+	assetsDir, err := ioutil.TempDir("", "cluster-controller-tests-assets")
+	if err != nil {
+		t.Fatalf("failed to create assets dir: %v", err)
+	}
+	c := New(logger, executorCreator, provisioner, clusterStore, 10*time.Minute, assetsDir)
 	go c.Run(ctx)
 
 	// Create a new cluster in the store
@@ -181,7 +185,7 @@ func TestClusterControllerReconciliationLoop(t *testing.T) {
 	logger := log.New(os.Stdout, "[cluster controller] ", log.Ldate|log.Ltime)
 
 	// Stub out dependencies
-	executorCreator := func(string) (install.Executor, error) { return dummyExec{}, nil }
+	executorCreator := func(string, string) (install.Executor, error) { return dummyExec{}, nil }
 
 	tmpFile, err := ioutil.TempFile("", "cluster-controller-tests")
 	if err != nil {
@@ -215,7 +219,11 @@ func TestClusterControllerReconciliationLoop(t *testing.T) {
 	// Start the controller
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	c := New(logger, executorCreator, provisioner, clusterStore, 1*time.Second)
+	assetsDir, err := ioutil.TempDir("", "cluster-controller-tests-assets")
+	if err != nil {
+		t.Fatalf("failed to create assets dir: %v", err)
+	}
+	c := New(logger, executorCreator, provisioner, clusterStore, 1*time.Second, assetsDir)
 	go c.Run(ctx)
 
 	// Assert that the cluster reaches desired state

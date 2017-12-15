@@ -20,16 +20,23 @@ type ClusterController interface {
 
 // ExecutorCreator creates executors that can be used for executing actions
 // against a specific cluster.
-type ExecutorCreator func(clusterName string) (install.Executor, error)
+type ExecutorCreator func(clusterName, assetsRootDir string) (install.Executor, error)
 
 // ProvisionerCreator creates provisioners that can be used for standing up
 // infrastructure for a specific cluster.
 type ProvisionerCreator func(store.Cluster) provision.Provisioner
 
 // New returns a cluster controller
-func New(l *log.Logger, execCreator ExecutorCreator, provisionerCreator ProvisionerCreator, cs store.ClusterStore, reconFreq time.Duration) ClusterController {
+func New(
+	logger *log.Logger,
+	execCreator ExecutorCreator,
+	provisionerCreator ProvisionerCreator,
+	cs store.ClusterStore,
+	reconFreq time.Duration,
+	assetsRootDir string) ClusterController {
 	return &multiClusterController{
-		log:                l,
+		assetsRootDir:      assetsRootDir,
+		log:                logger,
 		newExecutor:        execCreator,
 		clusterStore:       cs,
 		reconcileFreq:      reconFreq,
@@ -48,8 +55,8 @@ func New(l *log.Logger, execCreator ExecutorCreator, provisionerCreator Provisio
 //     - kismatic.log
 //     - assets/
 //     - runs/
-func DefaultExecutorCreator(rootDir string) ExecutorCreator {
-	return func(clusterName string) (install.Executor, error) {
+func DefaultExecutorCreator() ExecutorCreator {
+	return func(clusterName string, rootDir string) (install.Executor, error) {
 		err := os.MkdirAll(filepath.Join(rootDir, clusterName), 0700)
 		if err != nil {
 			return nil, fmt.Errorf("error creating directories for executor: %v", err)
