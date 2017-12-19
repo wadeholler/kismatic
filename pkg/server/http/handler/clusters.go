@@ -12,7 +12,6 @@ import (
 
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/store"
-	"github.com/apprenda/kismatic/pkg/util"
 	"github.com/julienschmidt/httprouter"
 	"github.com/mholt/archiver"
 )
@@ -20,6 +19,12 @@ import (
 // ErrClusterNotFound is the error returned by the API when a requested cluster
 // is not found in the server.
 var ErrClusterNotFound = errors.New("cluster details not found in the store")
+
+// the states that can be requested through the API
+var validStates = []string{"planned", "provisioned", "installed"}
+
+// the provisioners that are supported
+var validProvisionerProviders = []string{"aws"}
 
 // The Clusters handler exposes endpoints for managing the lifecycle of clusters
 type Clusters struct {
@@ -67,134 +72,7 @@ type AWSProvisionerOptions struct {
 	SecretAccessKey string `json:"secretAccessKey,omitempty"`
 }
 
-// TODO should this be extracted from the install pkg?
-type validatable interface {
-	validate() (bool, []error)
-}
-
-type validator struct {
-	errs []error
-}
-
-func newValidator() *validator {
-	return &validator{
-		errs: []error{},
-	}
-}
-
-func (v *validator) addError(err ...error) {
-	v.errs = append(v.errs, err...)
-}
-
-func (v *validator) validate(obj validatable) {
-	if ok, err := obj.validate(); !ok {
-		v.addError(err...)
-	}
-}
-
-func (v *validator) valid() (bool, []error) {
-	if len(v.errs) > 0 {
-		return false, v.errs
-	}
-	return true, nil
-}
-
-func (r *ClusterRequest) validate() (bool, []error) {
-	v := newValidator()
-	if r.Name == "" {
-		v.addError(fmt.Errorf("name cannot be empty"))
-	}
-	if r.DesiredState == "" {
-		v.addError(fmt.Errorf("desiredState cannot be empty"))
-	} else {
-		if !util.Contains(r.DesiredState, validStates) {
-			v.addError(fmt.Errorf("%s is not a valid desiredState, options are: %v", r.DesiredState, validStates))
-		}
-	}
-	if r.EtcdCount <= 0 {
-		v.addError(fmt.Errorf("cluster.etcdCount must be greater than 0"))
-	}
-	if r.MasterCount <= 0 {
-		v.addError(fmt.Errorf("cluster.masterCount must be greater than 0"))
-	}
-	if r.WorkerCount <= 0 {
-		v.addError(fmt.Errorf("cluster.workerCount must be greater than 0"))
-	}
-	if r.IngressCount < 0 {
-		v.addError(fmt.Errorf("cluster.ingressCount must be greater than or equal to 0"))
-	}
-	v.validate(&r.Provisioner)
-	return v.valid()
-}
-
-func (p *Provisioner) validate() (bool, []error) {
-	v := newValidator()
-	if p.Provider == "" {
-		v.addError(fmt.Errorf("provisioner.provider cannot be empty"))
-	} else {
-		if !util.Contains(p.Provider, validProvisionerProviders) {
-			v.addError(fmt.Errorf("%s is not a valid provisioner.provider, options are: %v", p.Provider, validProvisionerProviders))
-		}
-		switch p.Provider {
-		case "aws":
-			if p.AWSOptions == nil || p.AWSOptions.AccessKeyID == "" {
-				v.addError(fmt.Errorf("provisioner.options.accessKeyID cannot be empty"))
-			}
-			if p.AWSOptions == nil || p.AWSOptions.SecretAccessKey == "" {
-				v.addError(fmt.Errorf("provisioner.options.secretAccessKey cannot be empty"))
-			}
-		}
-	}
-	return v.valid()
-}
-
-type clusterUpdate struct {
-	id      string
-	request ClusterRequest
-	inStore store.Cluster
-}
-
-func (c *clusterUpdate) validate() (bool, []error) {
-	v := newValidator()
-	if c.id != c.request.Name {
-		v.addError(fmt.Errorf("name must match the cluster requested"))
-	}
-	if c.request.DesiredState == "" {
-		v.addError(fmt.Errorf("desiredState cannot be empty"))
-	} else {
-		if !util.Contains(c.request.DesiredState, validStates) {
-			v.addError(fmt.Errorf("%s is not a valid desiredState, options are: %v", c.request.DesiredState, validStates))
-		}
-	}
-	if c.request.EtcdCount != 0 && (c.request.EtcdCount != c.inStore.Spec.EtcdCount) {
-		v.addError(fmt.Errorf("cluster.etcdCount cannot be modified"))
-	}
-	// allow adding/removing of master, worker or ingress nodes
-	if c.request.MasterCount == 0 {
-		v.addError(fmt.Errorf("cluster.masterCount must be greater than 0"))
-	}
-	if c.request.WorkerCount == 0 {
-		v.addError(fmt.Errorf("cluster.workerCount must be greater than 0"))
-	}
-	if c.request.IngressCount < 0 {
-		v.addError(fmt.Errorf("cluster.ingressCount must be greater than or equal to 0"))
-	}
-	// always require provisioner credentials
-	v.validate(&c.request.Provisioner)
-	return v.valid()
-}
-
-func formatErrs(errs []error) []string {
-	out := make([]string, 0, len(errs))
-	for _, err := range errs {
-		out = append(out, err.Error())
-	}
-	return out
-}
-
-var validStates = []string{"planned", "provisioned", "installed"}
-var validProvisionerProviders = []string{"aws"}
-
+// Create a cluster as described in the request body's JSON payload.
 func (api Clusters) Create(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	req := &ClusterRequest{}
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
@@ -235,6 +113,7 @@ func (api Clusters) Create(w http.ResponseWriter, r *http.Request, _ httprouter.
 	w.Write([]byte("ok\n"))
 }
 
+// Update the cluster with the given name
 func (api Clusters) Update(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("name")
 	fromStore, err := getFromStore(id, api.Store)
@@ -296,6 +175,7 @@ func (api Clusters) Update(w http.ResponseWriter, r *http.Request, p httprouter.
 	fmt.Fprintln(w, string(bytes))
 }
 
+// Get the cluster with the given name
 func (api Clusters) Get(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("name")
 	fromStore, err := getFromStore(id, api.Store)
@@ -321,6 +201,7 @@ func (api Clusters) Get(w http.ResponseWriter, r *http.Request, p httprouter.Par
 	w.Header().Set("Content-Type", "application/json")
 }
 
+// GetAll returns all the clusters that are defined in the API
 func (api Clusters) GetAll(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	fromStore, err := getAllFromStore(api.Store)
 	if err != nil {
@@ -420,6 +301,8 @@ func (api Clusters) GetLogs(w http.ResponseWriter, r *http.Request, p httprouter
 	http.ServeFile(w, r, f)
 }
 
+// GetAssets creates a tarball with all the assets that were generated for the
+// cluster, and return them in the response
 func (api Clusters) GetAssets(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	id := p.ByName("name")
 	exists, err := existsInStore(id, api.Store)
