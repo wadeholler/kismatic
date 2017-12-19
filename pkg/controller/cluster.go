@@ -342,11 +342,13 @@ func writePlanFile(clusterName string, filePlanner install.FilePlanner, clusterS
 	// Set values in the plan
 	p.Cluster.Name = clusterName
 	p.Provisioner = install.Provisioner{Provider: clusterSpec.Provisioner.Provider}
-	// TODO: Handle provisioner specific options (e.g. AWS Region)
+
+	// Set infrastructure provider specific options
 	switch clusterSpec.Provisioner.Provider {
 	case "aws":
-		p.Provisioner.AWSOptions = &install.AWSProvisionerOptions{}
-		// nothing
+		p.Provisioner.AWSOptions = &install.AWSProvisionerOptions{
+			Region: clusterSpec.Provisioner.Options.AWS.Region,
+		}
 	case "azure":
 		p.AddOns.CNI.Provider = "weave"
 	}
