@@ -12,10 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/apprenda/kismatic/pkg/install"
-
 	"github.com/apprenda/kismatic/pkg/controller"
-	"github.com/apprenda/kismatic/pkg/provision"
+	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/server/http"
 	"github.com/apprenda/kismatic/pkg/server/http/handler"
 	"github.com/apprenda/kismatic/pkg/store"
@@ -127,19 +125,18 @@ func doServer(stdout io.Writer, options serverOptions) error {
 	}()
 
 	// Setup provisioner
-	terraform := provision.Terraform{
-		Output:          os.Stdout,
-		BinaryPath:      filepath.Join(pwd, "terraform/bin/terraform"),
-		KismaticVersion: install.KismaticVersion,
-	}
+	tfCreater := controller.TerraformProvisionerCreator(
+		filepath.Join(pwd, "terraform/bin/terraform"),
+		install.KismaticVersion,
+	)
 
 	ctrl := controller.New(
 		logger,
 		controller.DefaultExecutorCreator(),
-		controller.DefaultProvisionerCreator(terraform),
+		tfCreater,
 		clusterStore,
 		10*time.Minute,
-		assetsDir,
+		controller.AssetsDir(assetsDir),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	go ctrl.Run(ctx)

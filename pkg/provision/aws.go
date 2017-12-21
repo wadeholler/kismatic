@@ -94,19 +94,21 @@ func (aws AWS) Provision(plan install.Plan) (*install.Plan, error) {
 	initCmd := exec.Command(aws.BinaryPath, "init", providerDir)
 	initCmd.Env = cmdEnv
 	initCmd.Dir = cmdDir
-	if out, err := initCmd.CombinedOutput(); err != nil {
-		fmt.Fprintln(aws.Output, string(out))
+	initCmd.Stdout = aws.Terraform.Output
+	initCmd.Stderr = aws.Terraform.Output
+	if err := initCmd.Run(); err != nil {
 		return nil, fmt.Errorf("Error initializing terraform: %s", err)
 	}
 
 	// Terraform plan
 	planCmd := exec.Command(aws.BinaryPath, "plan", fmt.Sprintf("-out=%s", plan.Cluster.Name), providerDir)
+	planCmd.Stdout = aws.Terraform.Output
+	planCmd.Stderr = aws.Terraform.Output
 	planCmd.Env = cmdEnv
 	planCmd.Dir = cmdDir
 
-	if out, err := planCmd.CombinedOutput(); err != nil {
-		fmt.Fprintln(aws.Output, string(out))
-		return nil, fmt.Errorf("Error running terraform plan: %s", out)
+	if err := planCmd.Run(); err != nil {
+		return nil, fmt.Errorf("Error running terraform plan: %s", err)
 	}
 
 	// Terraform apply
