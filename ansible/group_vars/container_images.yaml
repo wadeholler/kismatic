@@ -22,10 +22,10 @@ official_images:
     version: v1.6.3
   calico_cni:
     name: calico/cni
-    version: v1.11.2
+    version: v2.0.0
   calico_kube_controller:
     name: calico/kube-controllers
-    version: v1.0.2
+    version: v2.0.0
   cni_bin:
     name: apprenda/cni-bin
     version: v0.6.0
