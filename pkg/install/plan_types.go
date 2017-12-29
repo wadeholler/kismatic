@@ -16,7 +16,7 @@ const (
 )
 
 func InfrastructureProviders() []string {
-	return []string{"aws", ""}
+	return []string{"aws", "azure", ""}
 }
 
 func packageManagerProviders() []string {
@@ -79,18 +79,29 @@ type Plan struct {
 type Provisioner struct {
 	// The provider where the infrastructue will be provisioned to.
 	// The provisioner will expect provider specific ENV variables to be set.
-	// Options: aws
+	// Options: aws, azure, ""
 	Provider string
 	// AWS specific options.
 	// Only set if using "aws" provider
-	AWSOptions *AWSProvisionerOptions `yaml:"options,omitempty"`
+	AWSOptions *AWSProvisionerOptions `yaml:"aws_options,omitempty"`
+	// Azure specific options.
+	// Only set if using "azure" provider
+	AzureOptions *AzureProvisionerOptions `yaml:"azure_options,omitempty"`
 }
 
-// AWSProvisionerOptions contains specific options used when provisioning infrastructue
+// AWSProvisionerOptions contains specific options used when provisioning infrastructue on AWS
 type AWSProvisionerOptions struct {
 	// The AWS region to deploy in
 	// +required
-	Region string `yaml:"region`
+	Region string `yaml:"region"`
+	//TODO: add AZ options, and make machine-type configurable.
+}
+
+// AazureProvisionerOptions contains specific options used when provisioning infrastructue Azure
+type AzureProvisionerOptions struct {
+	// The Azure region to deploy in
+	// +required
+	Location string `yaml:"location"`
 }
 
 // Cluster describes a Kubernetes cluster
@@ -335,7 +346,7 @@ type CNI struct {
 // CNIOptions that can be configured for each CNI provider.
 type CNIOptions struct {
 	// The options that can be configured for the Calico CNI provider.
-	Calico CalicoOptions
+	Calico CalicoOptions `yaml:"calico,omitempty"`
 }
 
 // The CalicoOptions that can be configured for the Calico CNI provider.
