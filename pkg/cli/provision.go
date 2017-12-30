@@ -30,9 +30,9 @@ func NewCmdProvision(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comm
 
 			tf := provision.AnyTerraform{
 				Output:          out,
-				BinaryPath:      filepath.Join(path, "terraform/bin/terraform"),
+				BinaryPath:      filepath.Join(path, "terraform"),
 				KismaticVersion: install.KismaticVersion.String(),
-				ProvidersDir:    filepath.Join(path, "terraform", "providers"),
+				ProvidersDir:    filepath.Join(path, "providers"),
 				StateDir:        filepath.Join(path, assetsFolder),
 				SecretsGetter:   environmentSecretsGetter{},
 			}
@@ -67,10 +67,10 @@ func NewCmdDestroy(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comman
 			}
 			tf := provision.AnyTerraform{
 				Output:          out,
-				BinaryPath:      filepath.Join(path, "terraform/bin/terraform"),
+				BinaryPath:      filepath.Join(path, "./terraform"),
 				KismaticVersion: install.KismaticVersion.String(),
-				ProvidersDir:    filepath.Join(path, "terraform", "providers"),
-				StateDir:        filepath.Join(path, "terraform", "clusters"),
+				ProvidersDir:    filepath.Join(path, "providers"),
+				StateDir:        filepath.Join(path, assetsFolder),
 				SecretsGetter:   environmentSecretsGetter{},
 			}
 

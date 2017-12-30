@@ -131,16 +131,16 @@ func doServer(stdout io.Writer, options serverOptions) error {
 	provisionerCreator := func(store.Cluster) provision.Provisioner {
 		return provision.AnyTerraform{
 			Output:          os.Stdout,
-			BinaryPath:      filepath.Join(pwd, "terraform/bin/terraform"),
+			BinaryPath:      filepath.Join(pwd, "terraform"),
 			KismaticVersion: install.KismaticVersion.String(),
 			StateDir:        assetsDir,
-			ProvidersDir:    filepath.Join(pwd, "terraform", "providers"),
+			ProvidersDir:    filepath.Join(pwd, "providers"),
 			SecretsGetter:   storeSecretsGetter{store: clusterStore},
 		}
 	}
 
 	planner := plan.ProviderTemplatePlanner{
-		ProvidersDir: filepath.Join(pwd, "terraform", "providers"),
+		ProvidersDir: filepath.Join(pwd, "providers"),
 	}
 
 	ctrl := controller.New(

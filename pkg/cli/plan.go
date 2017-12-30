@@ -29,7 +29,7 @@ func NewCmdPlan(in io.Reader, out io.Writer, options *installOpts) *cobra.Comman
 }
 
 func doPlan(in io.Reader, out io.Writer, planner install.FilePlanner) error {
-	providersDir := "./terraform/providers"
+	providersDir := "./providers"
 	fmt.Fprintln(out, "Plan your Kubernetes cluster:")
 
 	name, err := util.PromptForAnyString(in, out, "Cluster name (must be unique)", "kismatic-cluster")
