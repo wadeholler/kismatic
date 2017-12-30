@@ -77,11 +77,19 @@ func (e dummyExec) UpgradeClusterServices(plan install.Plan) error {
 type dummyProvisioner struct{}
 
 func (p dummyProvisioner) Provision(plan install.Plan) (*install.Plan, error) {
-	return &plan, nil
+	return &install.Plan{}, nil
 }
 
-func (p dummyProvisioner) Destroy(string) error {
+func (p dummyProvisioner) Destroy(string, string) error {
 	return nil
+}
+
+type dummyPlanner struct {
+	plan install.Plan
+}
+
+func (p dummyPlanner) GetPlanTemplate(provider string) (*install.Plan, error) {
+	return &p.plan, nil
 }
 
 func TestClusterControllerTriggeredByWatch(t *testing.T) {
@@ -120,7 +128,7 @@ func TestClusterControllerTriggeredByWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create assets dir: %v", err)
 	}
-	c := New(logger, executorCreator, provisioner, clusterStore, 10*time.Minute, assetsDir)
+	c := New(logger, dummyPlanner{}, executorCreator, provisioner, clusterStore, 10*time.Minute, assetsDir)
 	go c.Run(ctx)
 
 	// Create a new cluster in the store
@@ -223,7 +231,7 @@ func TestClusterControllerReconciliationLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create assets dir: %v", err)
 	}
-	c := New(logger, executorCreator, provisioner, clusterStore, 1*time.Second, assetsDir)
+	c := New(logger, dummyPlanner{}, executorCreator, provisioner, clusterStore, 1*time.Second, assetsDir)
 	go c.Run(ctx)
 
 	// Assert that the cluster reaches desired state

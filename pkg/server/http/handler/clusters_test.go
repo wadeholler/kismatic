@@ -58,12 +58,9 @@ func TestValidationShouldError(t *testing.T) {
 		&ClusterRequest{
 			Name:         "",
 			DesiredState: "installed",
-			Provisioner: Provisioner{
+			Provisioner: store.Provisioner{
 				Provider: "aws",
-				AWSOptions: &AWSProvisionerOptions{
-					AccessKeyID:     "ACCESS_ID",
-					SecretAccessKey: "SECRET",
-				},
+				Options:  map[string]string{},
 			},
 			EtcdCount:    3,
 			MasterCount:  2,
@@ -73,12 +70,9 @@ func TestValidationShouldError(t *testing.T) {
 		&ClusterRequest{
 			Name:         "foo",
 			DesiredState: "bar",
-			Provisioner: Provisioner{
+			Provisioner: store.Provisioner{
 				Provider: "aws",
-				AWSOptions: &AWSProvisionerOptions{
-					AccessKeyID:     "ACCESS_ID",
-					SecretAccessKey: "SECRET",
-				},
+				Options:  map[string]string{},
 			},
 			EtcdCount:    3,
 			MasterCount:  2,
@@ -88,57 +82,9 @@ func TestValidationShouldError(t *testing.T) {
 		&ClusterRequest{
 			Name:         "foo",
 			DesiredState: "installed",
-			Provisioner: Provisioner{
-				Provider: "foobar",
-				AWSOptions: &AWSProvisionerOptions{
-					AccessKeyID:     "ACCESS_ID",
-					SecretAccessKey: "SECRET",
-				},
-			},
-			EtcdCount:    3,
-			MasterCount:  2,
-			WorkerCount:  5,
-			IngressCount: 2,
-		},
-		&ClusterRequest{
-			Name:         "foo",
-			DesiredState: "installed",
-			Provisioner: Provisioner{
+			Provisioner: store.Provisioner{
 				Provider: "aws",
-				AWSOptions: &AWSProvisionerOptions{
-					AccessKeyID:     "",
-					SecretAccessKey: "SECRET",
-				},
-			},
-			EtcdCount:    3,
-			MasterCount:  2,
-			WorkerCount:  5,
-			IngressCount: 2,
-		},
-		&ClusterRequest{
-			Name:         "foo",
-			DesiredState: "installed",
-			Provisioner: Provisioner{
-				Provider: "aws",
-				AWSOptions: &AWSProvisionerOptions{
-					AccessKeyID:     "ACCESS_ID",
-					SecretAccessKey: "",
-				},
-			},
-			EtcdCount:    3,
-			MasterCount:  2,
-			WorkerCount:  5,
-			IngressCount: 2,
-		},
-		&ClusterRequest{
-			Name:         "foo",
-			DesiredState: "installed",
-			Provisioner: Provisioner{
-				Provider: "aws",
-				AWSOptions: &AWSProvisionerOptions{
-					AccessKeyID:     "ACCESS_ID",
-					SecretAccessKey: "SECRET",
-				},
+				Options:  map[string]string{},
 			},
 			EtcdCount:    0,
 			MasterCount:  2,
@@ -148,12 +94,9 @@ func TestValidationShouldError(t *testing.T) {
 		&ClusterRequest{
 			Name:         "foo",
 			DesiredState: "installed",
-			Provisioner: Provisioner{
+			Provisioner: store.Provisioner{
 				Provider: "aws",
-				AWSOptions: &AWSProvisionerOptions{
-					AccessKeyID:     "ACCESS_ID",
-					SecretAccessKey: "SECRET",
-				},
+				Options:  map[string]string{},
 			},
 			EtcdCount:    3,
 			MasterCount:  0,
@@ -163,12 +106,9 @@ func TestValidationShouldError(t *testing.T) {
 		&ClusterRequest{
 			Name:         "foo",
 			DesiredState: "installed",
-			Provisioner: Provisioner{
+			Provisioner: store.Provisioner{
 				Provider: "aws",
-				AWSOptions: &AWSProvisionerOptions{
-					AccessKeyID:     "ACCESS_ID",
-					SecretAccessKey: "SECRET",
-				},
+				Options:  map[string]string{},
 			},
 			EtcdCount:    3,
 			MasterCount:  2,
@@ -178,12 +118,9 @@ func TestValidationShouldError(t *testing.T) {
 		&ClusterRequest{
 			Name:         "foo",
 			DesiredState: "installed",
-			Provisioner: Provisioner{
+			Provisioner: store.Provisioner{
 				Provider: "aws",
-				AWSOptions: &AWSProvisionerOptions{
-					AccessKeyID:     "ACCESS_ID",
-					SecretAccessKey: "SECRET",
-				},
+				Options:  map[string]string{},
 			},
 			EtcdCount:    3,
 			MasterCount:  2,
@@ -234,12 +171,9 @@ func TestUpdateValidationShouldError(t *testing.T) {
 				request: ClusterRequest{
 					Name:         "foo",
 					DesiredState: "installed",
-					Provisioner: Provisioner{
+					Provisioner: store.Provisioner{
 						Provider: "aws",
-						AWSOptions: &AWSProvisionerOptions{
-							AccessKeyID:     "ACCESS_ID",
-							SecretAccessKey: "SECRET",
-						},
+						Options:  map[string]string{},
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -264,12 +198,9 @@ func TestUpdateValidationShouldError(t *testing.T) {
 				request: ClusterRequest{
 					Name:         "foo",
 					DesiredState: "installed",
-					Provisioner: Provisioner{
+					Provisioner: store.Provisioner{
 						Provider: "aws",
-						AWSOptions: &AWSProvisionerOptions{
-							AccessKeyID:     "ACCESS_ID",
-							SecretAccessKey: "SECRET",
-						},
+						Options:  map[string]string{},
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -294,12 +225,9 @@ func TestUpdateValidationShouldError(t *testing.T) {
 				request: ClusterRequest{
 					Name:         "foo",
 					DesiredState: "installed",
-					Provisioner: Provisioner{
+					Provisioner: store.Provisioner{
 						Provider: "aws",
-						AWSOptions: &AWSProvisionerOptions{
-							AccessKeyID:     "ACCESS_ID_NEW",
-							SecretAccessKey: "SECRET_NEW",
-						},
+						Options:  map[string]string{},
 					},
 					EtcdCount:    3,
 					MasterCount:  3,
@@ -324,12 +252,9 @@ func TestUpdateValidationShouldError(t *testing.T) {
 				request: ClusterRequest{
 					Name:         "foo",
 					DesiredState: "installed",
-					Provisioner: Provisioner{
+					Provisioner: store.Provisioner{
 						Provider: "aws",
-						AWSOptions: &AWSProvisionerOptions{
-							AccessKeyID:     "ACCESS_ID",
-							SecretAccessKey: "SECRET",
-						},
+						Options:  map[string]string{},
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -354,12 +279,9 @@ func TestUpdateValidationShouldError(t *testing.T) {
 				request: ClusterRequest{
 					Name:         "bar",
 					DesiredState: "installed",
-					Provisioner: Provisioner{
+					Provisioner: store.Provisioner{
 						Provider: "aws",
-						AWSOptions: &AWSProvisionerOptions{
-							AccessKeyID:     "ACCESS_ID",
-							SecretAccessKey: "SECRET",
-						},
+						Options:  map[string]string{},
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -384,12 +306,9 @@ func TestUpdateValidationShouldError(t *testing.T) {
 				request: ClusterRequest{
 					Name:         "foo",
 					DesiredState: "installed",
-					Provisioner: Provisioner{
+					Provisioner: store.Provisioner{
 						Provider: "aws",
-						AWSOptions: &AWSProvisionerOptions{
-							AccessKeyID:     "ACCESS_ID",
-							SecretAccessKey: "SECRET",
-						},
+						Options:  map[string]string{},
 					},
 					EtcdCount:    5,
 					MasterCount:  2,
@@ -414,12 +333,9 @@ func TestUpdateValidationShouldError(t *testing.T) {
 				request: ClusterRequest{
 					Name:         "foo",
 					DesiredState: "installed",
-					Provisioner: Provisioner{
+					Provisioner: store.Provisioner{
 						Provider: "aws",
-						AWSOptions: &AWSProvisionerOptions{
-							AccessKeyID:     "ACCESS_ID",
-							SecretAccessKey: "SECRET",
-						},
+						Options:  map[string]string{},
 					},
 					EtcdCount:    3,
 					MasterCount:  0,
@@ -444,12 +360,9 @@ func TestUpdateValidationShouldError(t *testing.T) {
 				request: ClusterRequest{
 					Name:         "foo",
 					DesiredState: "installed",
-					Provisioner: Provisioner{
+					Provisioner: store.Provisioner{
 						Provider: "aws",
-						AWSOptions: &AWSProvisionerOptions{
-							AccessKeyID:     "ACCESS_ID",
-							SecretAccessKey: "SECRET",
-						},
+						Options:  map[string]string{},
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -474,12 +387,9 @@ func TestUpdateValidationShouldError(t *testing.T) {
 				request: ClusterRequest{
 					Name:         "foo",
 					DesiredState: "installed",
-					Provisioner: Provisioner{
+					Provisioner: store.Provisioner{
 						Provider: "aws",
-						AWSOptions: &AWSProvisionerOptions{
-							AccessKeyID:     "ACCESS_ID",
-							SecretAccessKey: "SECRET",
-						},
+						Options:  map[string]string{},
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -516,12 +426,9 @@ func TestValidation(t *testing.T) {
 		&ClusterRequest{
 			Name:         "foo",
 			DesiredState: "installed",
-			Provisioner: Provisioner{
+			Provisioner: store.Provisioner{
 				Provider: "aws",
-				AWSOptions: &AWSProvisionerOptions{
-					AccessKeyID:     "ACCESS_ID",
-					SecretAccessKey: "SECRET",
-				},
+				Options:  map[string]string{},
 			},
 			EtcdCount:    3,
 			MasterCount:  2,
@@ -565,12 +472,9 @@ func TestCreateUpdateGetGetAllandDelete(t *testing.T) {
 	c := &ClusterRequest{
 		Name:         "foo",
 		DesiredState: "installed",
-		Provisioner: Provisioner{
+		Provisioner: store.Provisioner{
 			Provider: "aws",
-			AWSOptions: &AWSProvisionerOptions{
-				AccessKeyID:     "ACCESS_ID",
-				SecretAccessKey: "SECRET",
-			},
+			Options:  map[string]string{},
 		},
 		EtcdCount:    3,
 		MasterCount:  2,
@@ -614,12 +518,9 @@ func TestCreateUpdateGetGetAllandDelete(t *testing.T) {
 	c = &ClusterRequest{
 		Name:         "foo",
 		DesiredState: "installed",
-		Provisioner: Provisioner{
+		Provisioner: store.Provisioner{
 			Provider: "aws",
-			AWSOptions: &AWSProvisionerOptions{
-				AccessKeyID:     "ACCESS_ID",
-				SecretAccessKey: "SECRET",
-			},
+			Options:  map[string]string{},
 		},
 		EtcdCount:    3,
 		MasterCount:  2,
