@@ -12,10 +12,7 @@ import (
 
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/ssh"
-	yaml "gopkg.in/yaml.v2"
 )
-
-const providerDescriptorFilename = "provider.yaml"
 
 // The AnyTerraform provisioner uses Terraform to provision infrastructure using
 // providers that adhere to the KET provisioner spec.
@@ -29,40 +26,21 @@ type AnyTerraform struct {
 	SecretsGetter   SecretsGetter
 }
 
-// The SecretsGetter provides secrets required when interacting with cloud provider APIs.
-type SecretsGetter interface {
-	GetAsEnvironmentVariables(clusterName string, expectedEnvVars map[string]string) ([]string, error)
+// An aggregate of different tfNodes (different fields, the same nodes)
+// NOTE: these are organized a little differently than a traditional node group
+// due to limitations of terraform. A tfNodeGroup organizes each field into
+// parallel slices as opposed to a single slice with nodes containing the same
+// data.
+type tfNodeGroup struct {
+	IPs         []string
+	InternalIPs []string
+	Hosts       []string
 }
 
-type provider struct {
-	Description          string            `yaml:"description"`
-	EnvironmentVariables map[string]string `yaml:"environmentVariables"`
-}
-
-type ketVars struct {
-	KismaticVersion   string `json:"kismatic_version"`
-	ClusterOwner      string `json:"cluster_owner"`
-	PrivateSSHKeyPath string `json:"private_ssh_key_path"`
-	PublicSSHKeyPath  string `json:"public_ssh_key_path"`
-	ClusterName       string `json:"cluster_name"`
-	MasterCount       int    `json:"master_count"`
-	EtcdCount         int    `json:"etcd_count"`
-	WorkerCount       int    `json:"worker_count"`
-	IngressCount      int    `json:"ingress_count"`
-	StorageCount      int    `json:"storage_count"`
-}
-
-func readProviderDescriptor(providerDir string) (*provider, error) {
-	var p provider
-	providerDescriptorFile := filepath.Join(providerDir, providerDescriptorFilename)
-	b, err := ioutil.ReadFile(providerDescriptorFile)
-	if err != nil {
-		return nil, fmt.Errorf("could not read provider descriptor: %v", err)
-	}
-	if err := yaml.Unmarshal(b, &p); err != nil {
-		return nil, fmt.Errorf("could not unmarshal provider descriptor from %q: %v", providerDescriptorFile, err)
-	}
-	return &p, nil
+type tfOutputVar struct {
+	Sensitive  bool     `json:"sensitive"`
+	OutputType string   `json:"type"`
+	Value      []string `json:"value"`
 }
 
 // Provision creates the infrastructure required to support the cluster defined
@@ -147,37 +125,26 @@ func (at AnyTerraform) Provision(plan install.Plan) (*install.Plan, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get secrets required for provisioning infrastructure: %v", err)
 	}
-	cmdEnv := append(baseTerraformCmdEnv(), secretEnvVars...)
-	cmdDir := clusterStateDir
+
+	tf := tfCommand{
+		binaryPath: at.BinaryPath,
+		output:     at.Output,
+		env:        secretEnvVars,
+		workDir:    clusterStateDir,
+	}
 
 	// Terraform init
-	cmd := exec.Command(at.BinaryPath, "init", providerDir)
-	cmd.Env = cmdEnv
-	cmd.Dir = cmdDir
-	cmd.Stdout = at.Output
-	cmd.Stderr = at.Output
-	if err := cmd.Run(); err != nil {
+	if err := tf.run("init", providerDir); err != nil {
 		return nil, fmt.Errorf("Error initializing terraform: %s", err)
 	}
 
 	// Terraform plan
-	cmd = exec.Command(at.BinaryPath, "plan", fmt.Sprintf("-out=%s", plan.Cluster.Name), providerDir)
-	cmd.Env = cmdEnv
-	cmd.Dir = cmdDir
-	cmd.Stdout = at.Output
-	cmd.Stderr = at.Output
-
-	if err := cmd.Run(); err != nil {
+	if err := tf.run("plan", fmt.Sprintf("-out=%s", plan.Cluster.Name), providerDir); err != nil {
 		return nil, fmt.Errorf("Error running terraform plan: %s", err)
 	}
 
 	// Terraform apply
-	cmd = exec.Command(at.BinaryPath, "apply", "-input=false", plan.Cluster.Name)
-	cmd.Stdout = at.Output
-	cmd.Stderr = at.Output
-	cmd.Env = cmdEnv
-	cmd.Dir = cmdDir
-	if err := cmd.Run(); err != nil {
+	if err := tf.run("apply", "-input=false", plan.Cluster.Name); err != nil {
 		return nil, fmt.Errorf("Error running terraform apply: %s", err)
 	}
 
@@ -196,136 +163,74 @@ func (at AnyTerraform) Destroy(provider, clusterName string) error {
 	if err != nil {
 		return err
 	}
-
 	secretEnvVars, err := at.SecretsGetter.GetAsEnvironmentVariables(clusterName, p.EnvironmentVariables)
 	if err != nil {
 		return err
 	}
-
-	cmd := exec.Command(at.BinaryPath, "destroy", "-force")
-	cmd.Stdout = at.Output
-	cmd.Stderr = at.Output
-	cmd.Env = append(baseTerraformCmdEnv(), secretEnvVars...)
-	cmd.Dir = filepath.Join(at.StateDir, clusterName)
-	if err != nil {
-		return err
+	tf := tfCommand{
+		binaryPath: at.BinaryPath,
+		output:     at.Output,
+		env:        secretEnvVars,
+		workDir:    filepath.Join(at.StateDir, clusterName),
 	}
-	if err := cmd.Run(); err != nil {
+	if err := tf.run("destroy", "-force"); err != nil {
 		return errors.New("Error destroying infrastructure with Terraform")
 	}
 	return nil
 }
 
-func baseTerraformCmdEnv() []string {
-	return append(os.Environ(), "TF_IN_AUTOMATION=True")
-}
-
 func (at AnyTerraform) getLoadBalancer(clusterName, lbName string) (string, error) {
-	tfOutLB := fmt.Sprintf("%s_lb", lbName)
-	cmdDir := filepath.Join(at.StateDir, clusterName)
-
-	//load balancer
-	tfCmdOutputLB := exec.Command(at.BinaryPath, "output", "-json", tfOutLB)
-	tfCmdOutputLB.Dir = cmdDir
-	stdoutStderrLB, err := tfCmdOutputLB.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("Error collecting terraform output: %s", stdoutStderrLB)
+	ovr := outputVariableReader{
+		clusterName:  clusterName,
+		stateDir:     at.StateDir,
+		tfBinaryPath: at.BinaryPath,
 	}
-	lbData := tfOutputVar{}
-	if err := json.Unmarshal(stdoutStderrLB, &lbData); err != nil {
+	varName := fmt.Sprintf("%s_lb", lbName)
+	values, err := ovr.readStringSlice(varName)
+	if err != nil {
 		return "", err
 	}
-	if len(lbData.Value) != 1 {
-		return "", fmt.Errorf("Expect to get 1 load balancer, but got %d", len(lbData.Value))
+	if len(values) != 1 {
+		return "", fmt.Errorf("expected to get a single value for output variable %q, but got %d", varName, len(values))
 	}
-	return lbData.Value[0], nil
+	return values[0], nil
 }
 
 func (at AnyTerraform) getTerraformNodes(clusterName, role string) (*tfNodeGroup, error) {
-	tfOutPubIPs := fmt.Sprintf("%s_pub_ips", role)
-	tfOutPrivIPs := fmt.Sprintf("%s_priv_ips", role)
-	tfOutHosts := fmt.Sprintf("%s_hosts", role)
-	cmdDir := filepath.Join(at.StateDir, clusterName)
-
-	nodes := &tfNodeGroup{}
-
-	//Public IPs
-	tfCmdOutputPub := exec.Command(at.BinaryPath, "output", "-json", tfOutPubIPs)
-	tfCmdOutputPub.Dir = cmdDir
-	stdoutStderrPub, err := tfCmdOutputPub.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("Error collecting terraform output: %s", stdoutStderrPub)
+	ovr := outputVariableReader{
+		clusterName:  clusterName,
+		stateDir:     at.StateDir,
+		tfBinaryPath: at.BinaryPath,
 	}
-	pubIPData := tfOutputVar{}
-	if err := json.Unmarshal(stdoutStderrPub, &pubIPData); err != nil {
+	publicIPs, err := ovr.readStringSlice(fmt.Sprintf("%s_pub_ips", role))
+	if err != nil {
 		return nil, err
 	}
-	nodes.IPs = pubIPData.Value
-
-	//Private IPs
-	tfCmdOutputPriv := exec.Command(at.BinaryPath, "output", "-json", tfOutPrivIPs)
-	tfCmdOutputPriv.Dir = cmdDir
-	stdoutStderrPriv, err := tfCmdOutputPriv.CombinedOutput()
+	privateIPs, err := ovr.readStringSlice(fmt.Sprintf("%s_priv_ips", role))
 	if err != nil {
-		return nil, fmt.Errorf("Error collecting terraform output: %s", stdoutStderrPriv)
-	}
-	privIPData := tfOutputVar{}
-	if err := json.Unmarshal(stdoutStderrPriv, &privIPData); err != nil {
 		return nil, err
 	}
-	nodes.InternalIPs = privIPData.Value
-
-	//Hosts
-	tfCmdOutputHost := exec.Command(at.BinaryPath, "output", "-json", tfOutHosts)
-	tfCmdOutputHost.Dir = cmdDir
-	stdoutStderrHost, err := tfCmdOutputHost.CombinedOutput()
+	hostnames, err := ovr.readStringSlice(fmt.Sprintf("%s_hosts", role))
 	if err != nil {
-		return nil, fmt.Errorf("Error collecting terraform output: %s", stdoutStderrHost)
-	}
-	hostData := tfOutputVar{}
-	if err := json.Unmarshal(stdoutStderrHost, &hostData); err != nil {
 		return nil, err
 	}
-	nodes.Hosts = hostData.Value
 
-	if len(nodes.IPs) != len(nodes.Hosts) {
-		return nil, fmt.Errorf("Expected to get %d host names, but got %d", len(nodes.IPs), len(nodes.Hosts))
+	if len(publicIPs) != len(hostnames) {
+		return nil, fmt.Errorf("The number of public IPs (%d) does not match the number of hostnames (%d)", len(publicIPs), len(hostnames))
 	}
 
 	// Verify that we got the right number of internal IPs if we are using them
-	if len(nodes.InternalIPs) != 0 && len(nodes.IPs) != len(nodes.InternalIPs) {
-		return nil, fmt.Errorf("Expected to get %d internal IPs, but got %d", len(nodes.IPs), len(nodes.InternalIPs))
+	if len(privateIPs) != 0 && len(publicIPs) != len(privateIPs) {
+		return nil, fmt.Errorf("The number of public IPs (%d) does not match the number of private IPs (%d)", len(publicIPs), len(privateIPs))
 	}
 
-	return nodes, nil
+	return &tfNodeGroup{
+		IPs:         publicIPs,
+		InternalIPs: privateIPs,
+		Hosts:       hostnames,
+	}, nil
 }
 
-func (at AnyTerraform) getClusterStateDir(clusterName string) (string, error) {
-	path, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(path, "terraform", "clusters", clusterName), nil
-}
-
-func nodeGroupFromSlices(ips, internalIPs, hosts []string) install.NodeGroup {
-	ng := install.NodeGroup{}
-	ng.ExpectedCount = len(ips)
-	ng.Nodes = []install.Node{}
-	for i := range ips {
-		n := install.Node{
-			IP:   ips[i],
-			Host: hosts[i],
-		}
-		if len(internalIPs) != 0 {
-			n.InternalIP = internalIPs[i]
-		}
-		ng.Nodes = append(ng.Nodes, n)
-	}
-	return ng
-}
-
-// updatePlan
 func (at AnyTerraform) buildPopulatedPlan(plan install.Plan) (*install.Plan, error) {
 	// Masters
 	tfNodes, err := at.getTerraformNodes(plan.Cluster.Name, "master")
@@ -378,4 +283,49 @@ func (at AnyTerraform) buildPopulatedPlan(plan install.Plan) (*install.Plan, err
 	}
 
 	return &plan, nil
+}
+
+type tfCommand struct {
+	binaryPath string
+	output     io.Writer
+	env        []string
+	workDir    string
+}
+
+func (tfc tfCommand) run(args ...string) error {
+	cmd := exec.Command(tfc.binaryPath, args...)
+	cmd.Stdout = tfc.output
+	cmd.Stderr = tfc.output
+	cmd.Dir = tfc.workDir
+	cmd.Env = append(os.Environ(), "TF_IN_AUTOMATION=True")
+	cmd.Env = append(cmd.Env, tfc.env...)
+	return cmd.Run()
+}
+
+type outputVariableReader struct {
+	clusterName  string
+	stateDir     string
+	tfBinaryPath string
+}
+
+func (ovr outputVariableReader) read(varName string) (*tfOutputVar, error) {
+	cmd := exec.Command(ovr.tfBinaryPath, "output", "-json", varName)
+	cmd.Dir = filepath.Join(ovr.stateDir, ovr.clusterName)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("error getting output variable %q: %s", varName, out)
+	}
+	var ov tfOutputVar
+	if err := json.Unmarshal(out, &ov); err != nil {
+		return nil, fmt.Errorf("error unmarshaling output variable %q: %v", out, err)
+	}
+	return &ov, nil
+}
+
+func (ovr outputVariableReader) readStringSlice(varName string) ([]string, error) {
+	v, err := ovr.read(varName)
+	if err != nil {
+		return nil, err
+	}
+	return v.Value, nil
 }
