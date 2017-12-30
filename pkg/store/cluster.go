@@ -34,6 +34,7 @@ type ClusterStatus struct {
 type Provisioner struct {
 	Provider string            `json:"provider"`
 	Options  map[string]string `json:"options"`
+	Secrets  map[string]string `json:"secrets"`
 }
 
 // ClusterStore is a smaller interface into the store

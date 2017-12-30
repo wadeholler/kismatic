@@ -29,6 +29,7 @@ const (
 	destroyed       = "destroyed"
 )
 
+// The Planner returns a plan template for the given infrastructure provider
 type Planner interface {
 	GetPlanTemplate(provider string) (*install.Plan, error)
 }
@@ -243,8 +244,7 @@ func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
 func (c *clusterController) destroy(cluster store.Cluster) store.Cluster {
 	c.log.Printf("destroying cluster %q", c.clusterName)
 	provisioner := c.newProvisioner(cluster)
-	err := provisioner.Destroy(c.clusterName)
-	if err != nil {
+	if err := provisioner.Destroy(cluster.Spec.Provisioner.Provider, c.clusterName); err != nil {
 		c.log.Printf("error destroying cluster %q: %v", c.clusterName, err)
 		cluster.Status.CurrentState = destroyFailed
 		cluster.Status.WaitingForManualRetry = true
@@ -328,7 +328,6 @@ func (c clusterController) writePlanFile(clusterName string, filePlanner install
 	p.Worker.ExpectedCount = clusterSpec.WorkerCount
 	p.Ingress.ExpectedCount = clusterSpec.IngressCount
 	p.Provisioner = install.Provisioner{Provider: clusterSpec.Provisioner.Provider}
-	p.Provisioner.Options = clusterSpec.Provisioner.Options // TODO: the secrets are ending up in the plan file
-
+	p.Provisioner.Options = clusterSpec.Provisioner.Options
 	return filePlanner.Write(p)
 }

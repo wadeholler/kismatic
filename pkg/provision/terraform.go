@@ -2,6 +2,7 @@ package provision
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,10 +21,17 @@ const providerDescriptorFilename = "provider.yaml"
 // providers that adhere to the KET provisioner spec.
 type AnyTerraform struct {
 	KismaticVersion string
+	ClusterOwner    string
 	ProvidersDir    string
 	StateDir        string
-	Output          io.Writer
 	BinaryPath      string
+	Output          io.Writer
+	SecretsGetter   SecretsGetter
+}
+
+// The SecretsGetter provides secrets required when interacting with cloud provider APIs.
+type SecretsGetter interface {
+	GetAsEnvironmentVariables(clusterName string, expectedEnvVars map[string]string) ([]string, error)
 }
 
 type provider struct {
@@ -33,6 +41,7 @@ type provider struct {
 
 type ketVars struct {
 	KismaticVersion   string `json:"kismatic_version"`
+	ClusterOwner      string `json:"cluster_owner"`
 	PrivateSSHKeyPath string `json:"private_ssh_key_path"`
 	PublicSSHKeyPath  string `json:"public_ssh_key_path"`
 	ClusterName       string `json:"cluster_name"`
@@ -43,13 +52,7 @@ type ketVars struct {
 	StorageCount      int    `json:"storage_count"`
 }
 
-func (at AnyTerraform) GetExpectedEnvVars(providerName string) (map[string]string, error) {
-	providerDir := filepath.Join(at.ProvidersDir, providerName)
-	if _, err := os.Stat(providerDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("provider %q is not supported", providerName)
-	}
-
-	// Read the provider configuration
+func readProviderDescriptor(providerDir string) (*provider, error) {
 	var p provider
 	providerDescriptorFile := filepath.Join(providerDir, providerDescriptorFilename)
 	b, err := ioutil.ReadFile(providerDescriptorFile)
@@ -59,9 +62,11 @@ func (at AnyTerraform) GetExpectedEnvVars(providerName string) (map[string]strin
 	if err := yaml.Unmarshal(b, &p); err != nil {
 		return nil, fmt.Errorf("could not unmarshal provider descriptor from %q: %v", providerDescriptorFile, err)
 	}
-	return p.EnvironmentVariables, nil
+	return &p, nil
 }
 
+// Provision creates the infrastructure required to support the cluster defined
+// in the plan
 func (at AnyTerraform) Provision(plan install.Plan) (*install.Plan, error) {
 	providerName := plan.Provisioner.Provider
 	providerDir := filepath.Join(at.ProvidersDir, providerName)
@@ -69,15 +74,9 @@ func (at AnyTerraform) Provision(plan install.Plan) (*install.Plan, error) {
 		return nil, fmt.Errorf("provider %q is not supported", providerName)
 	}
 
-	// Read the provider configuration
-	var p provider
-	providerDescriptorFile := filepath.Join(providerDir, providerDescriptorFilename)
-	b, err := ioutil.ReadFile(providerDescriptorFile)
+	p, err := readProviderDescriptor(providerDir)
 	if err != nil {
-		return nil, fmt.Errorf("could not read provider descriptor: %v", err)
-	}
-	if err := yaml.Unmarshal(b, &p); err != nil {
-		return nil, fmt.Errorf("could not unmarshal provider descriptor from %q: %v", providerDescriptorFile, err)
+		return nil, err
 	}
 
 	// Create directory for keeping cluster state
@@ -114,6 +113,7 @@ func (at AnyTerraform) Provision(plan install.Plan) (*install.Plan, error) {
 	// Write out the KET terraform variables
 	data := ketVars{
 		KismaticVersion:   at.KismaticVersion,
+		ClusterOwner:      at.ClusterOwner,
 		ClusterName:       plan.Cluster.Name,
 		MasterCount:       plan.Master.ExpectedCount,
 		EtcdCount:         plan.Etcd.ExpectedCount,
@@ -123,7 +123,7 @@ func (at AnyTerraform) Provision(plan install.Plan) (*install.Plan, error) {
 		PrivateSSHKeyPath: privKeyPath,
 		PublicSSHKeyPath:  pubKeyPath,
 	}
-	b, err = json.MarshalIndent(data, "", "  ")
+	b, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return nil, err
 	}
@@ -132,22 +132,8 @@ func (at AnyTerraform) Provision(plan install.Plan) (*install.Plan, error) {
 		return nil, fmt.Errorf("error writing terraform variables: %v", err)
 	}
 
-	// Write out provider options as terraform variables, filtering out the ones that should be exposed as env vars
-	varsToWriteOut := map[string]string{}
-	for k, v := range plan.Provisioner.Options {
-		var shouldBeEnvVar bool
-		for envVarKey := range p.EnvironmentVariables {
-			if k == envVarKey {
-				shouldBeEnvVar = true
-			}
-		}
-		if shouldBeEnvVar {
-			continue
-		}
-		varsToWriteOut[k] = v
-	}
-
-	b, err = json.MarshalIndent(varsToWriteOut, "", "  ")
+	// Write out the provisioner options as terraform variables
+	b, err = json.MarshalIndent(plan.Provisioner.Options, "", "  ")
 	if err != nil {
 		return nil, err
 	}
@@ -157,44 +143,45 @@ func (at AnyTerraform) Provision(plan install.Plan) (*install.Plan, error) {
 	}
 
 	// Setup the environment for all Terraform commands.
-	cmdEnv, err := buildCommandEnv(plan.Provisioner.Options, p.EnvironmentVariables)
+	secretEnvVars, err := at.SecretsGetter.GetAsEnvironmentVariables(plan.Cluster.Name, p.EnvironmentVariables)
 	if err != nil {
-		return nil, fmt.Errorf("could not get environment variables for terraform commands: %v", err)
+		return nil, fmt.Errorf("could not get secrets required for provisioning infrastructure: %v", err)
 	}
+	cmdEnv := append(baseTerraformCmdEnv(), secretEnvVars...)
 	cmdDir := clusterStateDir
 
 	// Terraform init
-	initCmd := exec.Command(at.BinaryPath, "init", providerDir)
-	initCmd.Env = cmdEnv
-	initCmd.Dir = cmdDir
-	initCmd.Stdout = at.Output
-	initCmd.Stderr = at.Output
-	if err := initCmd.Run(); err != nil {
+	cmd := exec.Command(at.BinaryPath, "init", providerDir)
+	cmd.Env = cmdEnv
+	cmd.Dir = cmdDir
+	cmd.Stdout = at.Output
+	cmd.Stderr = at.Output
+	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("Error initializing terraform: %s", err)
 	}
 
 	// Terraform plan
-	planCmd := exec.Command(at.BinaryPath, "plan", fmt.Sprintf("-out=%s", plan.Cluster.Name), providerDir)
-	planCmd.Env = cmdEnv
-	planCmd.Dir = cmdDir
-	planCmd.Stdout = at.Output
-	planCmd.Stderr = at.Output
+	cmd = exec.Command(at.BinaryPath, "plan", fmt.Sprintf("-out=%s", plan.Cluster.Name), providerDir)
+	cmd.Env = cmdEnv
+	cmd.Dir = cmdDir
+	cmd.Stdout = at.Output
+	cmd.Stderr = at.Output
 
-	if err := planCmd.Run(); err != nil {
+	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("Error running terraform plan: %s", err)
 	}
 
 	// Terraform apply
-	applyCmd := exec.Command(at.BinaryPath, "apply", "-input=false", plan.Cluster.Name)
-	applyCmd.Stdout = at.Output
-	applyCmd.Stderr = at.Output
-	applyCmd.Env = cmdEnv
-	applyCmd.Dir = cmdDir
-	if err := applyCmd.Run(); err != nil {
+	cmd = exec.Command(at.BinaryPath, "apply", "-input=false", plan.Cluster.Name)
+	cmd.Stdout = at.Output
+	cmd.Stderr = at.Output
+	cmd.Env = cmdEnv
+	cmd.Dir = cmdDir
+	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("Error running terraform apply: %s", err)
 	}
 
-	// Update plan
+	// Update plan with data from provider
 	provisionedPlan, err := at.buildPopulatedPlan(plan)
 	if err != nil {
 		return nil, err
@@ -202,29 +189,35 @@ func (at AnyTerraform) Provision(plan install.Plan) (*install.Plan, error) {
 	return provisionedPlan, nil
 }
 
-func (at AnyTerraform) Destroy(plan install.Plan) error {
+// Destroy tears down the cluster and infrastructure defined in the plan file
+func (at AnyTerraform) Destroy(provider, clusterName string) error {
+	providerDir := filepath.Join(at.ProvidersDir, provider)
+	p, err := readProviderDescriptor(providerDir)
+	if err != nil {
+		return err
+	}
+
+	secretEnvVars, err := at.SecretsGetter.GetAsEnvironmentVariables(clusterName, p.EnvironmentVariables)
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command(at.BinaryPath, "destroy", "-force")
+	cmd.Stdout = at.Output
+	cmd.Stderr = at.Output
+	cmd.Env = append(baseTerraformCmdEnv(), secretEnvVars...)
+	cmd.Dir = filepath.Join(at.StateDir, clusterName)
+	if err != nil {
+		return err
+	}
+	if err := cmd.Run(); err != nil {
+		return errors.New("Error destroying infrastructure with Terraform")
+	}
 	return nil
 }
 
-// Returns a slice of env vars that are to be used for all terraform commands.
-// The slice is the intersection of the options that were set for the provider
-// and the list of expected env vars.
-func buildCommandEnv(providerOptions map[string]string, expectedEnvVars map[string]string) ([]string, error) {
-	env := os.Environ()
-	env = append(env, "TF_IN_AUTOMATION=True")
-	for optionName, envVarName := range expectedEnvVars {
-		var found bool
-		for k, v := range providerOptions {
-			if k == optionName {
-				env = append(env, fmt.Sprintf("%s=%s", envVarName, v))
-				found = true
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("provider option %q is required and it was not specified", optionName)
-		}
-	}
-	return env, nil
+func baseTerraformCmdEnv() []string {
+	return append(os.Environ(), "TF_IN_AUTOMATION=True")
 }
 
 func (at AnyTerraform) getLoadBalancer(clusterName, lbName string) (string, error) {

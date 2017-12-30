@@ -46,7 +46,7 @@ type tfOutputVar struct {
 // a given cluster.
 type Provisioner interface {
 	Provision(install.Plan) (*install.Plan, error)
-	Destroy(clusterName string) error
+	Destroy(provider, clusterName string) error
 }
 
 func (tf Terraform) getLoadBalancer(clusterName, lbName string) (string, error) {

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	nethttp "net/http"
@@ -127,10 +128,6 @@ func doServer(stdout io.Writer, options serverOptions) error {
 		}
 	}()
 
-	planner := plan.ProviderTemplatePlanner{
-		ProvidersDir: filepath.Join(pwd, "terraform", "providers"),
-	}
-
 	provisionerCreator := func(store.Cluster) provision.Provisioner {
 		return provision.AnyTerraform{
 			Output:          os.Stdout,
@@ -138,7 +135,12 @@ func doServer(stdout io.Writer, options serverOptions) error {
 			KismaticVersion: install.KismaticVersion.String(),
 			StateDir:        assetsDir,
 			ProvidersDir:    filepath.Join(pwd, "terraform", "providers"),
+			SecretsGetter:   storeSecretsGetter{store: clusterStore},
 		}
+	}
+
+	planner := plan.ProviderTemplatePlanner{
+		ProvidersDir: filepath.Join(pwd, "terraform", "providers"),
 	}
 
 	ctrl := controller.New(
@@ -163,4 +165,33 @@ func doServer(stdout io.Writer, options serverOptions) error {
 		logger.Fatalf("Error shutting down server: %v", err)
 	}
 	return nil
+}
+
+type storeSecretsGetter struct {
+	store store.ClusterStore
+}
+
+// GetAsEnvironmentVariables returns the expected environment variables sourcing
+// them from the cluster store.
+func (ssg storeSecretsGetter) GetAsEnvironmentVariables(clusterName string, expected map[string]string) ([]string, error) {
+	c, err := ssg.store.Get(clusterName)
+	if err != nil {
+		return nil, err
+	}
+	storedSecrets := c.Spec.Provisioner.Secrets
+	var envVars []string
+	for expectedKey, envVar := range expected {
+		var found bool
+		for key, value := range storedSecrets {
+			if key == expectedKey {
+				found = true
+				envVars = append(envVars, fmt.Sprintf("%s=%s", envVar, value))
+				continue
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("required option %q was not provided", expectedKey)
+		}
+	}
+	return envVars, nil
 }

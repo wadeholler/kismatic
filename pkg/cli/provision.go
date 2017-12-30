@@ -34,24 +34,7 @@ func NewCmdProvision(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comm
 				KismaticVersion: install.KismaticVersion.String(),
 				ProvidersDir:    filepath.Join(path, "terraform", "providers"),
 				StateDir:        filepath.Join(path, assetsFolder),
-			}
-
-			envVars, err := tf.GetExpectedEnvVars(plan.Provisioner.Provider)
-			if err != nil {
-				return err
-			}
-
-			// This is a little awkward... we need to get the env vars defined
-			// by the user to pass them to the provisioner, and then the
-			// provisioner sets them again. Not sure if there is a way
-			// around it though, as the provisioner needs to be able to work in both
-			// the daemon and CLI scenario
-			for optionName, envVarName := range envVars {
-				value := os.Getenv(envVarName)
-				if value == "" {
-					return fmt.Errorf("environment variable %q must be set", envVarName)
-				}
-				plan.Provisioner.Options[optionName] = value
+				SecretsGetter:   environmentSecretsGetter{},
 			}
 
 			updatedPlan, err := tf.Provision(*plan)
@@ -88,28 +71,27 @@ func NewCmdDestroy(in io.Reader, out io.Writer, opts *installOpts) *cobra.Comman
 				KismaticVersion: install.KismaticVersion.String(),
 				ProvidersDir:    filepath.Join(path, "terraform", "providers"),
 				StateDir:        filepath.Join(path, "terraform", "clusters"),
+				SecretsGetter:   environmentSecretsGetter{},
 			}
 
-			envVars, err := tf.GetExpectedEnvVars(plan.Provisioner.Provider)
-			if err != nil {
-				return err
-			}
-
-			// This is a little awkward... we need to get the env vars defined
-			// by the user to pass them to the provisioner, and then the
-			// provisioner sets them again. Not sure if there is a way
-			// around it though, as the provisioner needs to be able to work in both
-			// the daemon and CLI scenario
-			for optionName, envVarName := range envVars {
-				value := os.Getenv(envVarName)
-				if value == "" {
-					return fmt.Errorf("environment variable %q must be set", envVarName)
-				}
-				plan.Provisioner.Options[optionName] = value
-			}
-
-			return tf.Destroy(plan.Cluster.Name)
+			return tf.Destroy(plan.Provisioner.Provider, plan.Cluster.Name)
 		},
 	}
 	return cmd
+}
+
+type environmentSecretsGetter struct{}
+
+// GetAsEnvironmentVariables returns a slice of the expected environment
+// variables sourcing them from the current process' environment.
+func (environmentSecretsGetter) GetAsEnvironmentVariables(clusterName string, expected map[string]string) ([]string, error) {
+	var vars []string
+	for _, expectedEnvVar := range expected {
+		val := os.Getenv(expectedEnvVar)
+		if val == "" {
+			return nil, fmt.Errorf("the %q environment variable is required", expectedEnvVar)
+		}
+		vars = append(vars, fmt.Sprintf("%s=%s", expectedEnvVar, val))
+	}
+	return vars, nil
 }

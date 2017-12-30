@@ -368,10 +368,7 @@ func buildStoreCluster(req ClusterRequest) store.Cluster {
 		MasterCount:  req.MasterCount,
 		WorkerCount:  req.WorkerCount,
 		IngressCount: req.IngressCount,
-		Provisioner: store.Provisioner{
-			Provider: req.Provisioner.Provider,
-			Options:  req.Provisioner.Options,
-		},
+		Provisioner:  req.Provisioner,
 	}
 	return store.Cluster{
 		Spec: spec,
