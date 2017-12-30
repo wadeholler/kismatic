@@ -10,7 +10,6 @@ import (
 	"os"
 	"path"
 
-	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/store"
 	"github.com/julienschmidt/httprouter"
 	"github.com/mholt/archiver"
@@ -35,41 +34,26 @@ type Clusters struct {
 
 // ClusterRequest is the cluster resource defined by the user of the API
 type ClusterRequest struct {
-	Name         string      `json:"name"`
-	DesiredState string      `json:"desiredState"`
-	EtcdCount    int         `json:"etcdCount"`
-	MasterCount  int         `json:"masterCount"`
-	WorkerCount  int         `json:"workerCount"`
-	IngressCount int         `json:"ingressCount"`
-	Provisioner  Provisioner `json:"provisioner"`
+	Name         string            `json:"name"`
+	DesiredState string            `json:"desiredState"`
+	EtcdCount    int               `json:"etcdCount"`
+	MasterCount  int               `json:"masterCount"`
+	WorkerCount  int               `json:"workerCount"`
+	IngressCount int               `json:"ingressCount"`
+	Provisioner  store.Provisioner `json:"provisioner"`
 }
 
 // ClusterResponse is the cluster resource returned by the server
 type ClusterResponse struct {
-	Name         string      `json:"name"`
-	DesiredState string      `json:"desiredState"`
-	CurrentState string      `json:"currentState"`
-	ClusterIP    string      `json:"clusterIP"`
-	EtcdCount    int         `json:"etcdCount"`
-	MasterCount  int         `json:"masterCount"`
-	WorkerCount  int         `json:"workerCount"`
-	IngressCount int         `json:"ingressCount"`
-	Provisioner  Provisioner `json:"provisioner"`
-}
-
-// The Provisioner defines the infrastructure provisioner that should be used
-// for hosting the cluster
-type Provisioner struct {
-	// Options: aws
-	Provider   string                 `json:"provider"`
-	AWSOptions *AWSProvisionerOptions `json:"options,omitempty"`
-}
-
-// The AWSProvisionerOptions are options that are specific to the AWS provisioner
-type AWSProvisionerOptions struct {
-	install.AWSProvisionerOptions
-	AccessKeyID     string `json:"accessKeyID,omitempty"`
-	SecretAccessKey string `json:"secretAccessKey,omitempty"`
+	Name         string            `json:"name"`
+	DesiredState string            `json:"desiredState"`
+	CurrentState string            `json:"currentState"`
+	ClusterIP    string            `json:"clusterIP"`
+	EtcdCount    int               `json:"etcdCount"`
+	MasterCount  int               `json:"masterCount"`
+	WorkerCount  int               `json:"workerCount"`
+	IngressCount int               `json:"ingressCount"`
+	Provisioner  store.Provisioner `json:"provisioner"`
 }
 
 // Create a cluster as described in the request body's JSON payload.
@@ -150,8 +134,7 @@ func (api Clusters) Update(w http.ResponseWriter, r *http.Request, p httprouter.
 	// Update the fields that can be updated
 	fromStore.Spec.DesiredState = req.DesiredState
 	fromStore.Status.WaitingForManualRetry = false
-	fromStore.Spec.Provisioner.Credentials.AWS.AccessKeyId = req.Provisioner.AWSOptions.AccessKeyID
-	fromStore.Spec.Provisioner.Credentials.AWS.SecretAccessKey = req.Provisioner.AWSOptions.SecretAccessKey
+	fromStore.Spec.Provisioner.Options = req.Provisioner.Options // Figure out how to prevent user from changing specific options (for example, changing the region)
 	fromStore.Spec.MasterCount = req.MasterCount
 	fromStore.Spec.WorkerCount = req.WorkerCount
 	fromStore.Spec.IngressCount = req.IngressCount
@@ -387,19 +370,8 @@ func buildStoreCluster(req ClusterRequest) store.Cluster {
 		IngressCount: req.IngressCount,
 		Provisioner: store.Provisioner{
 			Provider: req.Provisioner.Provider,
+			Options:  req.Provisioner.Options,
 		},
-	}
-	switch req.Provisioner.Provider {
-	case "aws":
-		if req.Provisioner.AWSOptions != nil {
-			creds := store.ProvisionerCredentials{
-				AWS: store.AWSCredentials{
-					AccessKeyId:     req.Provisioner.AWSOptions.AccessKeyID,
-					SecretAccessKey: req.Provisioner.AWSOptions.SecretAccessKey,
-				},
-			}
-			spec.Provisioner.Credentials = creds
-		}
 	}
 	return store.Cluster{
 		Spec: spec,
@@ -407,9 +379,6 @@ func buildStoreCluster(req ClusterRequest) store.Cluster {
 }
 
 func buildResponse(name string, sc store.Cluster) ClusterResponse {
-	provisioner := Provisioner{
-		Provider: sc.Spec.Provisioner.Provider,
-	}
 	// TODO: The user can post provisioner specific options... We need to be
 	// able to show them back to the user
 	return ClusterResponse{
@@ -419,7 +388,7 @@ func buildResponse(name string, sc store.Cluster) ClusterResponse {
 		MasterCount:  sc.Spec.MasterCount,
 		WorkerCount:  sc.Spec.WorkerCount,
 		IngressCount: sc.Spec.IngressCount,
-		Provisioner:  provisioner,
+		Provisioner:  sc.Spec.Provisioner, // Figure out how to filter out sensitive options
 		CurrentState: sc.Status.CurrentState,
 		ClusterIP:    sc.Status.ClusterIP,
 	}

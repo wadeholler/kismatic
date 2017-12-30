@@ -29,6 +29,7 @@ type ProvisionerCreator func(store.Cluster) provision.Provisioner
 // New returns a cluster controller
 func New(
 	logger *log.Logger,
+	planner Planner,
 	execCreator ExecutorCreator,
 	provisionerCreator ProvisionerCreator,
 	cs store.ClusterStore,
@@ -37,6 +38,7 @@ func New(
 	return &multiClusterController{
 		assetsRootDir:      assetsRootDir,
 		log:                logger,
+		planner:            planner,
 		newExecutor:        execCreator,
 		clusterStore:       cs,
 		reconcileFreq:      reconFreq,
@@ -81,18 +83,19 @@ func DefaultExecutorCreator() ExecutorCreator {
 
 // DefaultProvisionerCreator uses terraform for provisioning infrastructure
 // on the clouds we support.
-func DefaultProvisionerCreator(terraform provision.Terraform) ProvisionerCreator {
-	return func(cluster store.Cluster) provision.Provisioner {
-		switch cluster.Spec.Provisioner.Provider {
-		case "aws":
-			p := provision.AWS{
-				AccessKeyID:     cluster.Spec.Provisioner.Credentials.AWS.AccessKeyId,
-				SecretAccessKey: cluster.Spec.Provisioner.Credentials.AWS.SecretAccessKey,
-				Terraform:       terraform,
-			}
-			return p
-		default:
-			panic(fmt.Sprintf("provider not supported: %q", cluster.Spec.Provisioner.Provider))
-		}
-	}
-}
+// func DefaultProvisionerCreator(terraform provision.Terraform) ProvisionerCreator {
+// 	return func(cluster store.Cluster) provision.Provisioner {
+// 		return provision.AnyTerraform{}
+// 		switch cluster.Spec.Provisioner.Provider {
+// 		case "aws":
+// 			p := provision.AWS{
+// 				AccessKeyID:     cluster.Spec.Provisioner.Credentials.AWS.AccessKeyId,
+// 				SecretAccessKey: cluster.Spec.Provisioner.Credentials.AWS.SecretAccessKey,
+// 				Terraform:       terraform,
+// 			}
+// 			return p
+// 		default:
+// 			panic(fmt.Sprintf("provider not supported: %q", cluster.Spec.Provisioner.Provider))
+// 		}
+// 	}
+// }

@@ -145,23 +145,6 @@ func (tf Terraform) getClusterStateDir(clusterName string) (string, error) {
 	return filepath.Join(path, "terraform", "clusters", clusterName), nil
 }
 
-func nodeGroupFromSlices(ips, internalIPs, hosts []string) install.NodeGroup {
-	ng := install.NodeGroup{}
-	ng.ExpectedCount = len(ips)
-	ng.Nodes = []install.Node{}
-	for i := range ips {
-		n := install.Node{
-			IP:   ips[i],
-			Host: hosts[i],
-		}
-		if len(internalIPs) != 0 {
-			n.InternalIP = internalIPs[i]
-		}
-		ng.Nodes = append(ng.Nodes, n)
-	}
-	return ng
-}
-
 // updatePlan
 func (tf Terraform) buildPopulatedPlan(plan install.Plan) (*install.Plan, error) {
 	// Masters

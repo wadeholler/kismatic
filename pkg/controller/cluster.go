@@ -29,6 +29,10 @@ const (
 	destroyed       = "destroyed"
 )
 
+type Planner interface {
+	GetPlanTemplate(provider string) (*install.Plan, error)
+}
+
 // The clusterController manages the lifecycle of a single cluster.
 type clusterController struct {
 	clusterName      string
@@ -37,6 +41,7 @@ type clusterController struct {
 	log              *log.Logger
 	executor         install.Executor
 	newProvisioner   func(store.Cluster) provision.Provisioner
+	planner          Planner
 	clusterStore     store.ClusterStore
 }
 
@@ -190,21 +195,8 @@ func (c *clusterController) plan(cluster store.Cluster) store.Cluster {
 		return cluster
 	}
 
-	// If a plan already exists, reuse the password instead of generating a new one.
-	var existingPassword string
 	fp := install.FilePlanner{File: c.planFilePath()}
-	if fp.PlanExists() {
-		p, err := fp.Read()
-		if err != nil {
-			c.log.Printf("error reading the existing plan for cluster %q: %v", c.clusterName, err)
-			cluster.Status.CurrentState = planningFailed
-			cluster.Status.WaitingForManualRetry = true
-			return cluster
-		}
-		existingPassword = p.Cluster.AdminPassword
-	}
-
-	err := writePlanFile(c.clusterName, fp, cluster.Spec, existingPassword)
+	err := c.writePlanFile(c.clusterName, fp, cluster.Spec)
 	if err != nil {
 		c.log.Printf("error planning installation for cluster %q: %v", c.clusterName, err)
 		cluster.Status.CurrentState = planningFailed
@@ -323,32 +315,20 @@ func (c *clusterController) install(cluster store.Cluster) store.Cluster {
 	return cluster
 }
 
-func writePlanFile(clusterName string, filePlanner install.FilePlanner, clusterSpec store.ClusterSpec, existingPassword string) error {
-	planTemplate := install.PlanTemplateOptions{
-		AdminPassword: existingPassword,
-		EtcdNodes:     clusterSpec.EtcdCount,
-		MasterNodes:   clusterSpec.MasterCount,
-		WorkerNodes:   clusterSpec.WorkerCount,
-		IngressNodes:  clusterSpec.IngressCount,
-	}
-	planner := &install.BytesPlanner{}
-	if err := install.WritePlanTemplate(planTemplate, planner); err != nil {
-		return fmt.Errorf("could not write plan template: %v", err)
-	}
-	p, err := planner.Read()
+func (c clusterController) writePlanFile(clusterName string, filePlanner install.FilePlanner, clusterSpec store.ClusterSpec) error {
+	// Get the plan template for the given provider
+	p, err := c.planner.GetPlanTemplate(clusterSpec.Provisioner.Provider)
 	if err != nil {
-		return fmt.Errorf("could not read plan: %v", err)
+		return fmt.Errorf("could not get plan file template for provider %q: %v", clusterSpec.Provisioner.Provider, err)
 	}
-	// Set values in the plan
+	// Set values in plan according to cluster spec
 	p.Cluster.Name = clusterName
+	p.Etcd.ExpectedCount = clusterSpec.EtcdCount
+	p.Master.ExpectedCount = clusterSpec.MasterCount
+	p.Worker.ExpectedCount = clusterSpec.WorkerCount
+	p.Ingress.ExpectedCount = clusterSpec.IngressCount
 	p.Provisioner = install.Provisioner{Provider: clusterSpec.Provisioner.Provider}
-	// TODO: Handle provisioner specific options (e.g. AWS Region)
-	switch clusterSpec.Provisioner.Provider {
-	case "aws":
-		p.Provisioner.AWSOptions = &install.AWSProvisionerOptions{}
-		// nothing
-	case "azure":
-		p.AddOns.CNI.Provider = "weave"
-	}
+	p.Provisioner.Options = clusterSpec.Provisioner.Options // TODO: the secrets are ending up in the plan file
+
 	return filePlanner.Write(p)
 }

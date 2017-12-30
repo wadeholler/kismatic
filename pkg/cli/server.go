@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/apprenda/kismatic/pkg/install"
+	"github.com/apprenda/kismatic/pkg/plan"
 
 	"github.com/apprenda/kismatic/pkg/controller"
 	"github.com/apprenda/kismatic/pkg/provision"
@@ -126,17 +127,25 @@ func doServer(stdout io.Writer, options serverOptions) error {
 		}
 	}()
 
-	// Setup provisioner
-	terraform := provision.Terraform{
-		Output:          os.Stdout,
-		BinaryPath:      filepath.Join(pwd, "terraform/bin/terraform"),
-		KismaticVersion: install.KismaticVersion,
+	planner := plan.ProviderTemplatePlanner{
+		ProvidersDir: filepath.Join(pwd, "terraform", "providers"),
+	}
+
+	provisionerCreator := func(store.Cluster) provision.Provisioner {
+		return provision.AnyTerraform{
+			Output:          os.Stdout,
+			BinaryPath:      filepath.Join(pwd, "terraform/bin/terraform"),
+			KismaticVersion: install.KismaticVersion.String(),
+			StateDir:        assetsDir,
+			ProvidersDir:    filepath.Join(pwd, "terraform", "providers"),
+		}
 	}
 
 	ctrl := controller.New(
 		logger,
+		planner,
 		controller.DefaultExecutorCreator(),
-		controller.DefaultProvisionerCreator(terraform),
+		provisionerCreator,
 		clusterStore,
 		10*time.Minute,
 		assetsDir,

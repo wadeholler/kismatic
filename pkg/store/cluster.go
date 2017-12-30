@@ -32,20 +32,8 @@ type ClusterStatus struct {
 // The Provisioner specifies the infrastructure provisioner that should be used
 // for the cluster.
 type Provisioner struct {
-	Provider    string
-	Credentials ProvisionerCredentials
-}
-
-// ProvisionerCredentials are the credentials necessary for connecting to the
-// infrastructure provisioner.
-type ProvisionerCredentials struct {
-	AWS AWSCredentials
-}
-
-// AWSCredentials are the credentials for interacting with the AWS API.
-type AWSCredentials struct {
-	AccessKeyId     string
-	SecretAccessKey string
+	Provider string            `json:"provider"`
+	Options  map[string]string `json:"options"`
 }
 
 // ClusterStore is a smaller interface into the store
