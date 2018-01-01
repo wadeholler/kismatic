@@ -1,0 +1,15 @@
+{
+  "storage-driver": "overlay2",
+  "icc": false,
+  "disable-legacy-registry": true,
+  "live-restore": true{% if docker.logs.opts | length > 0 %},{% endif %}
+
+{% if docker.logs.driver != "" %}
+  "log-driver": "{{ docker.logs.driver }}"{% if docker.logs.opts | length > 0 %},{% endif %}
+
+{% if docker.logs.opts | length > 0 %}
+  "log-opts":
+    {{ docker.logs.opts | to_nice_json(indent=4) }}
+{% endif %}
+{% endif %}
+}
