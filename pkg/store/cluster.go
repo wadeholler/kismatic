@@ -34,12 +34,21 @@ type ClusterStatus struct {
 type Provisioner struct {
 	Provider    string
 	Credentials ProvisionerCredentials
+	Options     ProvisionerOptions
 }
 
 // ProvisionerCredentials are the credentials necessary for connecting to the
 // infrastructure provisioner.
 type ProvisionerCredentials struct {
 	AWS AWSCredentials
+}
+
+type ProvisionerOptions struct {
+	AWS AWSProvisionerOptions
+}
+
+type AWSProvisionerOptions struct {
+	Region string
 }
 
 // AWSCredentials are the credentials for interacting with the AWS API.

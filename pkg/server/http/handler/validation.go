@@ -76,11 +76,14 @@ func (p *Provisioner) validate() (bool, []error) {
 		}
 		switch p.Provider {
 		case "aws":
-			if p.AWSOptions == nil || p.AWSOptions.AccessKeyID == "" {
-				v.addError(fmt.Errorf("provisioner.options.accessKeyID cannot be empty"))
+			if p.Options[awsOptionAccessKeyID] == "" {
+				v.addError(fmt.Errorf("provisioner.options.accessKeyId cannot be empty"))
 			}
-			if p.AWSOptions == nil || p.AWSOptions.SecretAccessKey == "" {
+			if p.Options[awsOptionSecretAccessKey] == "" {
 				v.addError(fmt.Errorf("provisioner.options.secretAccessKey cannot be empty"))
+			}
+			if p.Options[awsOptionRegion] == "" {
+				v.addError(fmt.Errorf("provisioner.options.region cannot be empty"))
 			}
 		}
 	}

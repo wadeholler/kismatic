@@ -81,9 +81,10 @@ The error: %v
 					IngressCount: 1,
 					Provisioner: handler.Provisioner{
 						Provider: "aws",
-						AWSOptions: &handler.AWSProvisionerOptions{
-							AccessKeyID:     accessKeyID,
-							SecretAccessKey: secretAccessKey,
+						Options: map[string]string{
+							"accessKeyId":     accessKeyID,
+							"secretAccessKey": secretAccessKey,
+							"region":          "us-east-1",
 						},
 					},
 				}

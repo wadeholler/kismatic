@@ -10,21 +10,26 @@ import (
 	"os"
 	"path"
 
-	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/store"
 	"github.com/julienschmidt/httprouter"
 	"github.com/mholt/archiver"
 )
 
-// ErrClusterNotFound is the error returned by the API when a requested cluster
-// is not found in the server.
-var ErrClusterNotFound = errors.New("cluster details not found in the store")
+var (
+	awsOptionAccessKeyID     = "accessKeyId"
+	awsOptionSecretAccessKey = "secretAccessKey"
+	awsOptionRegion          = "region"
 
-// the states that can be requested through the API
-var validStates = []string{"planned", "provisioned", "installed"}
+	// ErrClusterNotFound is the error returned by the API when a requested cluster
+	// is not found in the server.
+	ErrClusterNotFound = errors.New("cluster details not found in the store")
 
-// the provisioners that are supported
-var validProvisionerProviders = []string{"aws"}
+	// the states that can be requested through the API
+	validStates = []string{"planned", "provisioned", "installed"}
+
+	// the provisioners that are supported
+	validProvisionerProviders = []string{"aws"}
+)
 
 // The Clusters handler exposes endpoints for managing the lifecycle of clusters
 type Clusters struct {
@@ -61,15 +66,8 @@ type ClusterResponse struct {
 // for hosting the cluster
 type Provisioner struct {
 	// Options: aws
-	Provider   string                 `json:"provider"`
-	AWSOptions *AWSProvisionerOptions `json:"options,omitempty"`
-}
-
-// The AWSProvisionerOptions are options that are specific to the AWS provisioner
-type AWSProvisionerOptions struct {
-	install.AWSProvisionerOptions
-	AccessKeyID     string `json:"accessKeyID,omitempty"`
-	SecretAccessKey string `json:"secretAccessKey,omitempty"`
+	Provider string            `json:"provider"`
+	Options  map[string]string `json:"options"`
 }
 
 // Create a cluster as described in the request body's JSON payload.
@@ -150,11 +148,15 @@ func (api Clusters) Update(w http.ResponseWriter, r *http.Request, p httprouter.
 	// Update the fields that can be updated
 	fromStore.Spec.DesiredState = req.DesiredState
 	fromStore.Status.WaitingForManualRetry = false
-	fromStore.Spec.Provisioner.Credentials.AWS.AccessKeyId = req.Provisioner.AWSOptions.AccessKeyID
-	fromStore.Spec.Provisioner.Credentials.AWS.SecretAccessKey = req.Provisioner.AWSOptions.SecretAccessKey
 	fromStore.Spec.MasterCount = req.MasterCount
 	fromStore.Spec.WorkerCount = req.WorkerCount
 	fromStore.Spec.IngressCount = req.IngressCount
+
+	switch fromStore.Spec.Provisioner.Provider {
+	case "aws":
+		fromStore.Spec.Provisioner.Credentials.AWS.AccessKeyId = req.Provisioner.Options[awsOptionAccessKeyID]
+		fromStore.Spec.Provisioner.Credentials.AWS.SecretAccessKey = req.Provisioner.Options[awsOptionSecretAccessKey]
+	}
 
 	if err := putToStore(req.Name, *fromStore, api.Store); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -391,14 +393,14 @@ func buildStoreCluster(req ClusterRequest) store.Cluster {
 	}
 	switch req.Provisioner.Provider {
 	case "aws":
-		if req.Provisioner.AWSOptions != nil {
-			creds := store.ProvisionerCredentials{
-				AWS: store.AWSCredentials{
-					AccessKeyId:     req.Provisioner.AWSOptions.AccessKeyID,
-					SecretAccessKey: req.Provisioner.AWSOptions.SecretAccessKey,
-				},
-			}
-			spec.Provisioner.Credentials = creds
+		spec.Provisioner.Credentials = store.ProvisionerCredentials{
+			AWS: store.AWSCredentials{
+				AccessKeyId:     req.Provisioner.Options[awsOptionAccessKeyID],
+				SecretAccessKey: req.Provisioner.Options[awsOptionSecretAccessKey],
+			},
+		}
+		spec.Provisioner.Options.AWS = store.AWSProvisionerOptions{
+			Region: req.Provisioner.Options[awsOptionRegion],
 		}
 	}
 	return store.Cluster{
@@ -410,8 +412,12 @@ func buildResponse(name string, sc store.Cluster) ClusterResponse {
 	provisioner := Provisioner{
 		Provider: sc.Spec.Provisioner.Provider,
 	}
-	// TODO: The user can post provisioner specific options... We need to be
-	// able to show them back to the user
+	switch provisioner.Provider {
+	case "aws":
+		provisioner.Options = map[string]string{
+			awsOptionRegion: sc.Spec.Provisioner.Options.AWS.Region,
+		}
+	}
 	return ClusterResponse{
 		Name:         name,
 		DesiredState: sc.Spec.DesiredState,
