@@ -26,6 +26,10 @@ func (e dummyExec) RunPreFlightCheck(*install.Plan) error {
 	return nil
 }
 
+func (e dummyExec) CopyInspector(*install.Plan) error {
+	return nil
+}
+
 func (e dummyExec) RunNewWorkerPreFlightCheck(install.Plan, install.Node) error {
 	panic("not implemented")
 }

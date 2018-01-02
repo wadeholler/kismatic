@@ -26,21 +26,22 @@ KET operational tools include:
 ## Components
 | Component | Version |
 | --- | --- |
-| Kubernetes | v1.8.4 |
-| Docker | v1.12.6 |
+| Kubernetes | v1.9.0 |
+| Docker | v17.03.2.ce |
 | Etcd (for Kubernetes) | v3.1.10 |
 | Etcd (for Calico & Contiv) | v3.1.10 |
-| Calico | v2.6.2 |
-| Weave | v2.0.5 |
+| Calico | v2.6.5 |
+| Weave | v2.1.3 |
 | Contiv | v1.1.1 |
+|NGINX Ingress Controller|v0.9.0|
 
 
 [Download KET here](https://github.com/apprenda/kismatic/releases)
 
 ## Supported Operating Systems
-- RHEL 7
-- CentOS 7
-- Ubuntu 16.04
+- RHEL 7.4
+- CentOS 7.3
+- Ubuntu 16.04.3
 
 # Usage Documentation
 
@@ -62,15 +63,15 @@ KET operational tools include:
 
 # Development Documentation
 
-[How to Build KET](BUILDING.md)
+[How to Build KET](docs/development/BUILDING.md)
 
-[How to Contribute to KET](CONTRIBUTING.md)
+[How to Contribute to KET](docs/development/CONTRIBUTING.md)
 
-[Running Integration Tests](INTEGRATION_TESTING.md)
+[Running Integration Tests](docs/development/INTEGRATION_TESTING.md)
 
-[KET Code of Conduct](code-of-conduct.md)
+[KET Code of Conduct](docs/development/code-of-conduct.md)
 
-[KET Release Process](RELEASE.md)
+[KET Release Process](docs/development/RELEASE.md)
 
 # Basic Installation Instructions
 Use the `kismatic install` command to work through installation of a cluster. The installer expects the underlying infrastructure to be accessible via SSH using Public Key Authentication.

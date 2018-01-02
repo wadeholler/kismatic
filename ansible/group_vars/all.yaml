@@ -1,9 +1,9 @@
 #===============================================================================
 # VERSIONS
-kubernetes_yum_version: 1.8.4-0
-kubernetes_deb_version: 1.8.4-00
-docker_engine_yum_version: 1.12.6-1.el7.centos
-docker_engine_apt_version: 1.12.6-0~ubuntu-xenial
+kubernetes_yum_version: 1.9.0-0
+kubernetes_deb_version: 1.9.0-00
+docker_ce_yum_version: 17.03.2.ce-1.el7.centos
+docker_ce_apt_version: 17.03.2~ce-0~ubuntu-xenial
 glusterfs_server_version_rhel: "3.8.15-2.el7"
 glusterfs_server_version_ubuntu: "3.8.15-ubuntu1~xenial1"
 
@@ -55,9 +55,9 @@ docker_certificates_cert_path: "{{ docker_install_dir }}/{{ docker_certificates_
 docker_certificates_key_path: "{{ docker_install_dir }}/{{ docker_certificates_key_file_name }}"
 #===============================================================================
 # docker configuration
-# docker_direct_lvm_enabled: no default
-# docker_direct_lvm_block_device_path: no default
-# docker_direct_lvm_deferred_deletion_enabled: no default
+# docker.storage.directlvm.enabled: no default
+# docker.storage.directlvm.block_device: no default
+# docker.storage.directlvm.enable_deferred_deletion: no default
 docker_device_mapper_thin_pool_autoextend_threshold: 80
 docker_device_mapper_thin_pool_autoextend_percent: 20
 docker_system_d: /etc/systemd/system/docker.service.d
@@ -79,7 +79,7 @@ contiv:
   certs:
     proxy_server_key_filename: "contiv-proxy-server-key.pem"
     proxy_server_cert_filename: "contiv-proxy-server.pem"
-  dir: 
+  dir:
     config: /etc/contiv
     var: /var/contiv
   proxy_server_certs_secret_name: "contiv-proxy-server-certs"
@@ -99,14 +99,12 @@ kubernetes_kubectl_config_dir: /root/.kube
 kubernetes_basic_auth_path: "{{kubernetes_auth_dir}}/basicauth.csv"
 kubernetes_authorization_policy_path: "{{kubernetes_auth_dir}}/authorization-policy.json"
 kubernetes_services_kubeconfig_path: "{{kubelet_lib_dir}}/kubeconfig"
-kubernetes_kubeconfig_path: "{{kubernetes_kubectl_config_dir}}/config" 
 
 kubernetes_kubeconfig:
   kubectl: "{{kubernetes_kubectl_config_dir}}/config"
   controller_manager: "{{kubernetes_install_dir}}/controller-manager.conf"
   scheduler: "{{kubernetes_install_dir}}/scheduler.conf"
   kubelet: "{{kubernetes_install_dir}}/kubelet.conf"
-  kube_proxy: "{{kubernetes_install_dir}}/kube-proxy.conf"
 
 # file modes
 kubernetes_executable_mode: 0775
@@ -132,9 +130,11 @@ cloud_config: "{% if cloud_config_local is defined and cloud_config_local != '' 
 
 # kubernetes certificate config
 # TODO: Do we want to change this?
-kubernetes_certificates_dir: "{{ kubernetes_install_dir }}/pki" 
+kubernetes_certificates_dir: "{{ kubernetes_install_dir }}/pki"
 kubernetes_certificates:
   ca: "{{ kubernetes_certificates_dir }}/ca.pem"
+  admin: "{{ kubernetes_certificates_dir }}/admin.pem"
+  admin_key: "{{ kubernetes_certificates_dir }}/admin-key.pem"
   api_server: "{{ kubernetes_certificates_dir }}/api-server.pem"
   api_server_key: "{{ kubernetes_certificates_dir }}/api-server-key.pem"
   etcd_client: "{{ kubernetes_certificates_dir }}/etcd-client.pem"
@@ -145,8 +145,6 @@ kubernetes_certificates:
   scheduler_key: "{{ kubernetes_certificates_dir }}/scheduler-key.pem"
   kubelet: "{{ kubernetes_certificates_dir }}/kubelet.pem"
   kubelet_key: "{{ kubernetes_certificates_dir }}/kubelet-key.pem"
-  kube_proxy: "{{ kubernetes_certificates_dir }}/kube-proxy.pem"
-  kube_proxy_key: "{{ kubernetes_certificates_dir }}/kube-proxy-key.pem"
   service_account: "{{ kubernetes_certificates_dir }}/service-account.pem"
   service_account_key: "{{ kubernetes_certificates_dir }}/service-account-key.pem"
 
@@ -156,9 +154,9 @@ kubernetes_api_server_option_defaults:
   "allow-privileged": "true"
   "apiserver-count": "{{ kubernetes_master_apiserver_count }}"
   "anonymous-auth": "false"
-  "authorization-mode": "Node,RBAC,ABAC"
-  "authorization-policy-file": "{{ kubernetes_authorization_policy_path }}"
-  "basic-auth-file": "{{ kubernetes_basic_auth_path }}"
+  "authorization-mode": "Node,RBAC{% if kubernetes_admin_password is defined and kubernetes_admin_password != '' %},ABAC{% endif %}" #TODO remove ABAC
+  "authorization-policy-file": "{% if kubernetes_admin_password is defined and kubernetes_admin_password != '' %}{{ kubernetes_authorization_policy_path }}{% endif %}"
+  "basic-auth-file": "{% if kubernetes_admin_password is defined and kubernetes_admin_password != '' %}{{ kubernetes_basic_auth_path }}{% endif %}"
   "bind-address": "0.0.0.0"
   "client-ca-file": "{{ kubernetes_certificates.ca }}"
   "cloud-provider": "{{ cloud_provider }}"
@@ -201,7 +199,6 @@ kube_scheduler_option_defaults:
 kube_proxy_option_defaults:
   "cluster-cidr": "{{ kubernetes_pods_cidr }}"
   "hostname-override": "{{ inventory_hostname }}"
-  "kubeconfig": "{{ kubernetes_kubeconfig.kube_proxy }}"
   "proxy-mode": "iptables"
   "v": "2"
 
@@ -219,7 +216,7 @@ kubelet_defaults:
   "hostname-override": "{{ inventory_hostname }}"
   "require-kubeconfig": "true"
   "kubeconfig": "{{ kubernetes_kubeconfig.kubelet }}"
-  "node-labels": "kismatic/host={{ inventory_hostname }},kismatic/cni-provider={{ cni.provider| quote }}{% if 'ingress' in group_names%},kismatic/ingress=true{% endif %}{% if 'storage' in group_names%},kismatic/storage=true{% endif %}{% if 'master' in group_names %},node-role.kubernetes.io/master={% endif %}"
+  "node-labels": "{% if 'master' in group_names %},node-role.kubernetes.io/master={% endif %}"
   "node-ip": "{{ internal_ipv4 }}"
   "pod-infra-container-image": "{{ images.pause }}"
   "pod-manifest-path": "{{ kubelet_pod_manifests_dir }}"
@@ -298,10 +295,10 @@ images:
 
 #===============================================================================
 # docker packages
-docker_yum_repository_url: https://yum.dockerproject.org/repo/main/centos/7/
-docker_yum_gpg_key_url: https://yum.dockerproject.org/gpg
-docker_deb_repository_url: https://apt.dockerproject.org/repo/
-docker_deb_gpg_key_url: https://apt.dockerproject.org/gpg
+docker_yum_repository_url: "https://download.docker.com/linux/centos/7/x86_64/stable/"
+docker_yum_gpg_key_url: "https://download.docker.com/linux/centos/gpg"
+docker_deb_repository_url: "https://download.docker.com/linux/ubuntu"
+docker_deb_gpg_key_url: "https://download.docker.com/linux/ubuntu/gpg"
 
 # kubernetes packages
 kubernetes_yum_repository_url: "https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64"
