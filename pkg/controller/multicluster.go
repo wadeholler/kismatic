@@ -3,11 +3,11 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/apprenda/kismatic/pkg/provision"
 
 	"github.com/apprenda/kismatic/pkg/store"
 )
@@ -32,10 +32,10 @@ const clusterControllerNotificationBuffer = 10
 // When a cluster is deleted from the store, the corresponding worker is
 // terminated.
 type multiClusterController struct {
-	assetsRootDir      string
+	assetsDir          AssetsDir
 	log                *log.Logger
 	newExecutor        ExecutorCreator
-	provisionerCreator func(store.Cluster) provision.Provisioner
+	provisionerCreator ProvisionerCreator
 	clusterStore       store.ClusterStore
 	reconcileFreq      time.Duration
 	clusterControllers map[string]chan<- struct{}
@@ -70,23 +70,14 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 					continue
 				}
 
+				cc, err := mcc.newClusterController(clusterName, cluster)
+				if err != nil {
+					mcc.log.Printf("error creating cluster controller for cluster %q: %v", clusterName, err)
+					continue
+				}
 				newChan := make(chan struct{}, clusterControllerNotificationBuffer)
 				ch = newChan
 				mcc.clusterControllers[clusterName] = newChan
-				executor, err := mcc.newExecutor(clusterName, mcc.assetsRootDir)
-				if err != nil {
-					mcc.log.Printf("error creating executor for new cluster: %v", err)
-					continue
-				}
-				cc := clusterController{
-					clusterName:      clusterName,
-					clusterSpec:      cluster.Spec,
-					clusterAssetsDir: filepath.Join(mcc.assetsRootDir, clusterName),
-					log:              mcc.log,
-					executor:         executor,
-					clusterStore:     mcc.clusterStore,
-					newProvisioner:   mcc.provisionerCreator,
-				}
 				go cc.run(newChan)
 			}
 
@@ -108,22 +99,13 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 			for clusterName, cluster := range definedClusters {
 				_, found := mcc.clusterControllers[clusterName]
 				if !found {
-					newChan := make(chan struct{}, clusterControllerNotificationBuffer)
-					mcc.clusterControllers[clusterName] = newChan
-					executor, err := mcc.newExecutor(clusterName, mcc.assetsRootDir)
+					cc, err := mcc.newClusterController(clusterName, cluster)
 					if err != nil {
-						mcc.log.Printf("error creating executor for new cluster: %v", err)
+						mcc.log.Printf("error creating cluster controller for cluster %q: %v", clusterName, err)
 						continue
 					}
-					cc := clusterController{
-						clusterName:      clusterName,
-						clusterSpec:      cluster.Spec,
-						clusterAssetsDir: filepath.Join(mcc.assetsRootDir, clusterName),
-						log:              mcc.log,
-						executor:         executor,
-						clusterStore:     mcc.clusterStore,
-						newProvisioner:   mcc.provisionerCreator,
-					}
+					newChan := make(chan struct{}, clusterControllerNotificationBuffer)
+					mcc.clusterControllers[clusterName] = newChan
 					go cc.run(newChan)
 				}
 			}
@@ -155,4 +137,33 @@ func (mcc *multiClusterController) Run(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func (mcc multiClusterController) newClusterController(clusterName string, cluster store.Cluster) (*clusterController, error) {
+	// Create assets dir and logfile for this cluster
+	clusterAssetsDir := mcc.assetsDir.ForCluster(clusterName)
+	err := os.MkdirAll(clusterAssetsDir, 0700)
+	if err != nil {
+		return nil, fmt.Errorf("error creating assets directory: %v", err)
+	}
+	logFile, err := os.Create(filepath.Join(clusterAssetsDir, "kismatic.log"))
+	if err != nil {
+		return nil, fmt.Errorf("error creating log file: %v", err)
+
+	}
+	executor, err := mcc.newExecutor(clusterName, mcc.assetsDir.ForCluster(clusterName), logFile)
+	if err != nil {
+		return nil, fmt.Errorf("error creating executor: %v", err)
+	}
+	cc := clusterController{
+		log:              mcc.log,
+		clusterName:      clusterName,
+		clusterSpec:      cluster.Spec,
+		clusterAssetsDir: clusterAssetsDir,
+		logFile:          logFile,
+		executor:         executor,
+		clusterStore:     mcc.clusterStore,
+		newProvisioner:   mcc.provisionerCreator,
+	}
+	return &cc, nil
 }

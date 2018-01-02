@@ -3,14 +3,15 @@ package controller
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
-	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/provision"
 	"github.com/apprenda/kismatic/pkg/store"
+	"github.com/blang/semver"
 )
 
 // The ClusterController manages the lifecycle of clusters
@@ -20,11 +21,20 @@ type ClusterController interface {
 
 // ExecutorCreator creates executors that can be used for executing actions
 // against a specific cluster.
-type ExecutorCreator func(clusterName, assetsRootDir string) (install.Executor, error)
+type ExecutorCreator func(clusterName, clusterAssetsDir string, logFile io.Writer) (install.Executor, error)
 
 // ProvisionerCreator creates provisioners that can be used for standing up
 // infrastructure for a specific cluster.
-type ProvisionerCreator func(store.Cluster) provision.Provisioner
+type ProvisionerCreator func(cluster store.Cluster, output io.Writer) provision.Provisioner
+
+// AssetsDir is the location where the controller will store all file-based
+// assets that are generated throughout the management of all clusters.
+type AssetsDir string
+
+// ForCluster returns the directory that holds assets for the given cluster
+func (ad AssetsDir) ForCluster(clusterName string) string {
+	return filepath.Join(string(ad), clusterName)
+}
 
 // New returns a cluster controller
 func New(
@@ -33,9 +43,9 @@ func New(
 	provisionerCreator ProvisionerCreator,
 	cs store.ClusterStore,
 	reconFreq time.Duration,
-	assetsRootDir string) ClusterController {
+	assetsDir AssetsDir) ClusterController {
 	return &multiClusterController{
-		assetsRootDir:      assetsRootDir,
+		assetsDir:          assetsDir,
 		log:                logger,
 		newExecutor:        execCreator,
 		clusterStore:       cs,
@@ -46,28 +56,12 @@ func New(
 }
 
 // DefaultExecutorCreator creates an executor that can be used to run operations
-// against a single cluster. The given rootDir is used as the root directory
-// under which new directories are created for each executor.
-//
-// The following directory structure is created under the rootDir for each
-// cluster executor:
-// - clusterName/
-//     - kismatic.log
-//     - assets/
-//     - runs/
+// against a single cluster.
 func DefaultExecutorCreator() ExecutorCreator {
-	return func(clusterName string, rootDir string) (install.Executor, error) {
-		err := os.MkdirAll(filepath.Join(rootDir, clusterName), 0700)
-		if err != nil {
-			return nil, fmt.Errorf("error creating directories for executor: %v", err)
-		}
-		logFile, err := os.Create(filepath.Join(rootDir, clusterName, "kismatic.log"))
-		if err != nil {
-			return nil, fmt.Errorf("error creating log file for executor: %v", err)
-		}
+	return func(clusterName string, clusterAssetsDir string, logFile io.Writer) (install.Executor, error) {
 		executorOpts := install.ExecutorOptions{
-			GeneratedAssetsDirectory: filepath.Join(rootDir, clusterName, "assets"),
-			RunsDirectory:            filepath.Join(rootDir, clusterName, "runs"),
+			GeneratedAssetsDirectory: filepath.Join(clusterAssetsDir, "assets"),
+			RunsDirectory:            filepath.Join(clusterAssetsDir, "runs"),
 			OutputFormat:             "simple",
 			Verbose:                  true,
 		}
@@ -79,16 +73,20 @@ func DefaultExecutorCreator() ExecutorCreator {
 	}
 }
 
-// DefaultProvisionerCreator uses terraform for provisioning infrastructure
+// TerraformProvisionerCreator uses terraform for provisioning infrastructure
 // on the clouds we support.
-func DefaultProvisionerCreator(terraform provision.Terraform) ProvisionerCreator {
-	return func(cluster store.Cluster) provision.Provisioner {
+func TerraformProvisionerCreator(binaryPath string, kismaticVersion semver.Version) ProvisionerCreator {
+	return func(cluster store.Cluster, output io.Writer) provision.Provisioner {
 		switch cluster.Spec.Provisioner.Provider {
 		case "aws":
 			p := provision.AWS{
 				AccessKeyID:     cluster.Spec.Provisioner.Credentials.AWS.AccessKeyId,
 				SecretAccessKey: cluster.Spec.Provisioner.Credentials.AWS.SecretAccessKey,
-				Terraform:       terraform,
+				Terraform: provision.Terraform{
+					Output:          output,
+					BinaryPath:      binaryPath,
+					KismaticVersion: kismaticVersion,
+				},
 			}
 			return p
 		default:
