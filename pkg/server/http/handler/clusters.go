@@ -16,10 +16,6 @@ import (
 )
 
 var (
-	awsOptionAccessKeyID     = "accessKeyId"
-	awsOptionSecretAccessKey = "secretAccessKey"
-	awsOptionRegion          = "region"
-
 	// ErrClusterNotFound is the error returned by the API when a requested cluster
 	// is not found in the server.
 	ErrClusterNotFound = errors.New("cluster details not found in the store")

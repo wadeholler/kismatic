@@ -119,7 +119,7 @@ func TestClusterControllerTriggeredByWatch(t *testing.T) {
 
 	clusterStore := store.NewClusterStore(s, bucketName)
 
-	provisionerCreator := func(store.Cluster, io.Writer) provision.Provisioner {
+	provisionerCreator := func(io.Writer) provision.Provisioner {
 		return dummyProvisioner{}
 	}
 
@@ -132,13 +132,7 @@ func TestClusterControllerTriggeredByWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create assets dir: %v", err)
 	}
-<<<<<<< HEAD
-	c := New(logger, dummyPlanner{}, executorCreator, provisioner, clusterStore, 10*time.Minute, assetsDir)
-||||||| merged common ancestors
-	c := New(logger, executorCreator, provisioner, clusterStore, 10*time.Minute, assetsDir)
-=======
-	c := New(logger, executorCreator, provisionerCreator, clusterStore, 10*time.Minute, AssetsDir(tmpDir))
->>>>>>> ket-server
+	c := New(logger, dummyPlanner{}, executorCreator, provisionerCreator, clusterStore, 10*time.Minute, AssetsDir(tmpDir))
 	go c.Run(ctx)
 
 	// Create a new cluster in the store
@@ -204,7 +198,7 @@ func TestClusterControllerReconciliationLoop(t *testing.T) {
 
 	// Stub out dependencies
 	executorCreator := func(string, string, io.Writer) (install.Executor, error) { return dummyExec{}, nil }
-	provisionerCreator := func(store.Cluster, io.Writer) provision.Provisioner {
+	provisionerCreator := func(io.Writer) provision.Provisioner {
 		return dummyProvisioner{}
 	}
 
@@ -240,13 +234,7 @@ func TestClusterControllerReconciliationLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create assets dir: %v", err)
 	}
-<<<<<<< HEAD
-	c := New(logger, dummyPlanner{}, executorCreator, provisioner, clusterStore, 1*time.Second, assetsDir)
-||||||| merged common ancestors
-	c := New(logger, executorCreator, provisioner, clusterStore, 1*time.Second, assetsDir)
-=======
-	c := New(logger, executorCreator, provisionerCreator, clusterStore, 1*time.Second, AssetsDir(tmpDir))
->>>>>>> ket-server
+	c := New(logger, dummyPlanner{}, executorCreator, provisionerCreator, clusterStore, 1*time.Second, AssetsDir(tmpDir))
 	go c.Run(ctx)
 
 	// Assert that the cluster reaches desired state
