@@ -1,5 +1,4 @@
 cluster:
-  admin_password: PoKdaYuVzamuxceq2
   networking:
     pod_cidr_block: 172.16.0.0/16
     service_cidr_block: 172.20.0.0/16
