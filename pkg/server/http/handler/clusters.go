@@ -46,17 +46,23 @@ type ClusterRequest struct {
 	Provisioner  store.Provisioner `json:"provisioner"`
 }
 
+// provisioner, but without the secrets
+type sanitizedProvisioner struct {
+	Provider string            `json:"provider"`
+	Options  map[string]string `json:"options"`
+}
+
 // ClusterResponse is the cluster resource returned by the server
 type ClusterResponse struct {
-	Name         string            `json:"name"`
-	DesiredState string            `json:"desiredState"`
-	CurrentState string            `json:"currentState"`
-	ClusterIP    string            `json:"clusterIP"`
-	EtcdCount    int               `json:"etcdCount"`
-	MasterCount  int               `json:"masterCount"`
-	WorkerCount  int               `json:"workerCount"`
-	IngressCount int               `json:"ingressCount"`
-	Provisioner  store.Provisioner `json:"provisioner"`
+	Name         string               `json:"name"`
+	DesiredState string               `json:"desiredState"`
+	CurrentState string               `json:"currentState"`
+	ClusterIP    string               `json:"clusterIP"`
+	EtcdCount    int                  `json:"etcdCount"`
+	MasterCount  int                  `json:"masterCount"`
+	WorkerCount  int                  `json:"workerCount"`
+	IngressCount int                  `json:"ingressCount"`
+	Provisioner  sanitizedProvisioner `json:"provisioner"`
 }
 
 // Create a cluster as described in the request body's JSON payload.
@@ -137,7 +143,7 @@ func (api Clusters) Update(w http.ResponseWriter, r *http.Request, p httprouter.
 	// Update the fields that can be updated
 	fromStore.Spec.DesiredState = req.DesiredState
 	fromStore.Status.WaitingForManualRetry = false
-	fromStore.Spec.Provisioner.Options = req.Provisioner.Options // Figure out how to prevent user from changing specific options (for example, changing the region)
+	fromStore.Spec.Provisioner.Options = req.Provisioner.Options // TODO: Figure out how to prevent user from changing specific options (for example, changing the region)
 	fromStore.Spec.MasterCount = req.MasterCount
 	fromStore.Spec.WorkerCount = req.WorkerCount
 	fromStore.Spec.IngressCount = req.IngressCount
@@ -379,8 +385,6 @@ func buildStoreCluster(req ClusterRequest) store.Cluster {
 }
 
 func buildResponse(name string, sc store.Cluster) ClusterResponse {
-	// TODO: The user can post provisioner specific options... We need to be
-	// able to show them back to the user
 	return ClusterResponse{
 		Name:         name,
 		DesiredState: sc.Spec.DesiredState,
@@ -388,7 +392,10 @@ func buildResponse(name string, sc store.Cluster) ClusterResponse {
 		MasterCount:  sc.Spec.MasterCount,
 		WorkerCount:  sc.Spec.WorkerCount,
 		IngressCount: sc.Spec.IngressCount,
-		Provisioner:  sc.Spec.Provisioner, // Figure out how to filter out sensitive options
+		Provisioner: sanitizedProvisioner{
+			Provider: sc.Spec.Provisioner.Provider,
+			Options:  sc.Spec.Provisioner.Options,
+		},
 		CurrentState: sc.Status.CurrentState,
 		ClusterIP:    sc.Status.ClusterIP,
 	}
