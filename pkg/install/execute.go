@@ -21,6 +21,7 @@ import (
 // environment defined in the plan file
 type PreFlightExecutor interface {
 	RunPreFlightCheck(*Plan) error
+	CopyInspector(*Plan) error
 	RunNewWorkerPreFlightCheck(Plan, Node) error
 	RunUpgradePreFlightCheck(*Plan, ListableNode) error
 }
@@ -327,6 +328,27 @@ func (ae *ansibleExecutor) RunPreFlightCheck(p *Plan) error {
 	t := task{
 		name:           "preflight",
 		playbook:       "preflight.yaml",
+		inventory:      buildInventoryFromPlan(p),
+		clusterCatalog: *cc,
+		explainer:      ae.preflightExplainer(),
+		plan:           *p,
+	}
+	return ae.execute(t)
+}
+
+// RunInspector against the nodes defined in the plan
+func (ae *ansibleExecutor) CopyInspector(p *Plan) error {
+	cc, err := ae.buildClusterCatalog(p)
+	if err != nil {
+		return err
+	}
+	cc = setPreflightOptions(*p, *cc)
+	if err != nil {
+		return err
+	}
+	t := task{
+		name:           "copy-inspector",
+		playbook:       "copy-inspector.yaml",
 		inventory:      buildInventoryFromPlan(p),
 		clusterCatalog: *cc,
 		explainer:      ae.preflightExplainer(),
@@ -693,10 +715,13 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 	}
 
 	// Setup docker options
-	cc.DockerDirectLVMEnabled = p.Docker.Storage.DirectLVM.Enabled
-	if cc.DockerDirectLVMEnabled {
-		cc.DockerDirectLVMBlockDevicePath = p.Docker.Storage.DirectLVM.BlockDevice
-		cc.DockerDirectLVMDeferredDeletionEnabled = p.Docker.Storage.DirectLVM.EnableDeferredDeletion
+	cc.Docker.Logs.Driver = p.Docker.Logs.Driver
+	cc.Docker.Logs.Opts = p.Docker.Logs.Opts
+
+	cc.Docker.Storage.DirectLVM.Enabled = p.Docker.Storage.DirectLVM.Enabled
+	if cc.Docker.Storage.DirectLVM.Enabled {
+		cc.Docker.Storage.DirectLVM.BlockDevice = p.Docker.Storage.DirectLVM.BlockDevice
+		cc.Docker.Storage.DirectLVM.EnableDeferredDeletion = p.Docker.Storage.DirectLVM.EnableDeferredDeletion
 	}
 
 	if p.Ingress.Nodes != nil && len(p.Ingress.Nodes) > 0 {
@@ -725,6 +750,8 @@ func (ae *ansibleExecutor) buildClusterCatalog(p *Plan) (*ansible.ClusterCatalog
 		cc.CNI.Provider = p.AddOns.CNI.Provider
 		cc.CNI.Options.Calico.Mode = p.AddOns.CNI.Options.Calico.Mode
 		cc.CNI.Options.Calico.LogLevel = p.AddOns.CNI.Options.Calico.LogLevel
+		cc.CNI.Options.Calico.WorkloadMTU = p.AddOns.CNI.Options.Calico.WorkloadMTU
+		cc.CNI.Options.Calico.FelixInputMTU = p.AddOns.CNI.Options.Calico.FelixInputMTU
 
 		if cc.CNI.Provider == cniProviderContiv {
 			cc.InsecureNetworkingEtcd = true

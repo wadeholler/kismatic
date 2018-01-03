@@ -60,7 +60,19 @@ func TestValidationShouldError(t *testing.T) {
 			DesiredState: "installed",
 			Provisioner: store.Provisioner{
 				Provider: "aws",
+<<<<<<< HEAD
 				Options:  map[string]string{},
+||||||| merged common ancestors
+				AWSOptions: &AWSProvisionerOptions{
+					AccessKeyID:     "ACCESS_ID",
+					SecretAccessKey: "SECRET",
+				},
+=======
+				Options: map[string]string{
+					awsOptionAccessKeyID:     "ACCESS_ID",
+					awsOptionSecretAccessKey: "SECRET",
+				},
+>>>>>>> ket-server
 			},
 			EtcdCount:    3,
 			MasterCount:  2,
@@ -72,7 +84,19 @@ func TestValidationShouldError(t *testing.T) {
 			DesiredState: "bar",
 			Provisioner: store.Provisioner{
 				Provider: "aws",
+<<<<<<< HEAD
 				Options:  map[string]string{},
+||||||| merged common ancestors
+				AWSOptions: &AWSProvisionerOptions{
+					AccessKeyID:     "ACCESS_ID",
+					SecretAccessKey: "SECRET",
+				},
+=======
+				Options: map[string]string{
+					awsOptionAccessKeyID:     "ACCESS_ID",
+					awsOptionSecretAccessKey: "SECRET",
+				},
+>>>>>>> ket-server
 			},
 			EtcdCount:    3,
 			MasterCount:  2,
@@ -82,9 +106,117 @@ func TestValidationShouldError(t *testing.T) {
 		&ClusterRequest{
 			Name:         "foo",
 			DesiredState: "installed",
+<<<<<<< HEAD
 			Provisioner: store.Provisioner{
+||||||| merged common ancestors
+			Provisioner: Provisioner{
+				Provider: "foobar",
+				AWSOptions: &AWSProvisionerOptions{
+					AccessKeyID:     "ACCESS_ID",
+					SecretAccessKey: "SECRET",
+				},
+			},
+			EtcdCount:    3,
+			MasterCount:  2,
+			WorkerCount:  5,
+			IngressCount: 2,
+		},
+		&ClusterRequest{
+			Name:         "foo",
+			DesiredState: "installed",
+			Provisioner: Provisioner{
+=======
+			Provisioner: Provisioner{
+				Provider: "foobar",
+				Options: map[string]string{
+					awsOptionAccessKeyID:     "ACCESS_ID",
+					awsOptionSecretAccessKey: "SECRET",
+				},
+			},
+			EtcdCount:    3,
+			MasterCount:  2,
+			WorkerCount:  5,
+			IngressCount: 2,
+		},
+		&ClusterRequest{
+			Name:         "foo",
+			DesiredState: "installed",
+			Provisioner: Provisioner{
+>>>>>>> ket-server
 				Provider: "aws",
+<<<<<<< HEAD
 				Options:  map[string]string{},
+||||||| merged common ancestors
+				AWSOptions: &AWSProvisionerOptions{
+					AccessKeyID:     "",
+					SecretAccessKey: "SECRET",
+				},
+			},
+			EtcdCount:    3,
+			MasterCount:  2,
+			WorkerCount:  5,
+			IngressCount: 2,
+		},
+		&ClusterRequest{
+			Name:         "foo",
+			DesiredState: "installed",
+			Provisioner: Provisioner{
+				Provider: "aws",
+				AWSOptions: &AWSProvisionerOptions{
+					AccessKeyID:     "ACCESS_ID",
+					SecretAccessKey: "",
+				},
+			},
+			EtcdCount:    3,
+			MasterCount:  2,
+			WorkerCount:  5,
+			IngressCount: 2,
+		},
+		&ClusterRequest{
+			Name:         "foo",
+			DesiredState: "installed",
+			Provisioner: Provisioner{
+				Provider: "aws",
+				AWSOptions: &AWSProvisionerOptions{
+					AccessKeyID:     "ACCESS_ID",
+					SecretAccessKey: "SECRET",
+				},
+=======
+				Options: map[string]string{
+					awsOptionAccessKeyID:     "",
+					awsOptionSecretAccessKey: "SECRET",
+				},
+			},
+			EtcdCount:    3,
+			MasterCount:  2,
+			WorkerCount:  5,
+			IngressCount: 2,
+		},
+		&ClusterRequest{
+			Name:         "foo",
+			DesiredState: "installed",
+			Provisioner: Provisioner{
+				Provider: "aws",
+				Options: map[string]string{
+					awsOptionAccessKeyID:     "ACCESS_ID",
+					awsOptionSecretAccessKey: "",
+				},
+			},
+			EtcdCount:    3,
+			MasterCount:  2,
+			WorkerCount:  5,
+			IngressCount: 2,
+		},
+		&ClusterRequest{
+			Name:         "foo",
+			DesiredState: "installed",
+			Provisioner: Provisioner{
+				Provider: "aws",
+				Options: map[string]string{
+					awsOptionAccessKeyID:     "ACCESS_ID",
+					awsOptionSecretAccessKey: "SECRET",
+				},
+>>>>>>> ket-server
 			},
 			EtcdCount:    0,
 			MasterCount:  2,
@@ -96,7 +228,19 @@ func TestValidationShouldError(t *testing.T) {
 			DesiredState: "installed",
 			Provisioner: store.Provisioner{
 				Provider: "aws",
+<<<<<<< HEAD
 				Options:  map[string]string{},
+||||||| merged common ancestors
+				AWSOptions: &AWSProvisionerOptions{
+					AccessKeyID:     "ACCESS_ID",
+					SecretAccessKey: "SECRET",
+				},
+=======
+				Options: map[string]string{
+					awsOptionAccessKeyID:     "ACCESS_ID",
+					awsOptionSecretAccessKey: "SECRET",
+				},
+>>>>>>> ket-server
 			},
 			EtcdCount:    3,
 			MasterCount:  0,
@@ -108,7 +252,19 @@ func TestValidationShouldError(t *testing.T) {
 			DesiredState: "installed",
 			Provisioner: store.Provisioner{
 				Provider: "aws",
+<<<<<<< HEAD
 				Options:  map[string]string{},
+||||||| merged common ancestors
+				AWSOptions: &AWSProvisionerOptions{
+					AccessKeyID:     "ACCESS_ID",
+					SecretAccessKey: "SECRET",
+				},
+=======
+				Options: map[string]string{
+					awsOptionAccessKeyID:     "ACCESS_ID",
+					awsOptionSecretAccessKey: "SECRET",
+				},
+>>>>>>> ket-server
 			},
 			EtcdCount:    3,
 			MasterCount:  2,
@@ -120,7 +276,19 @@ func TestValidationShouldError(t *testing.T) {
 			DesiredState: "installed",
 			Provisioner: store.Provisioner{
 				Provider: "aws",
+<<<<<<< HEAD
 				Options:  map[string]string{},
+||||||| merged common ancestors
+				AWSOptions: &AWSProvisionerOptions{
+					AccessKeyID:     "ACCESS_ID",
+					SecretAccessKey: "SECRET",
+				},
+=======
+				Options: map[string]string{
+					awsOptionAccessKeyID:     "ACCESS_ID",
+					awsOptionSecretAccessKey: "SECRET",
+				},
+>>>>>>> ket-server
 			},
 			EtcdCount:    3,
 			MasterCount:  2,
@@ -173,7 +341,20 @@ func TestUpdateValidationShouldError(t *testing.T) {
 					DesiredState: "installed",
 					Provisioner: store.Provisioner{
 						Provider: "aws",
+<<<<<<< HEAD
 						Options:  map[string]string{},
+||||||| merged common ancestors
+						AWSOptions: &AWSProvisionerOptions{
+							AccessKeyID:     "ACCESS_ID",
+							SecretAccessKey: "SECRET",
+						},
+=======
+						Options: map[string]string{
+							awsOptionRegion:          "us-east-1",
+							awsOptionAccessKeyID:     "ACCESS_ID",
+							awsOptionSecretAccessKey: "SECRET",
+						},
+>>>>>>> ket-server
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -200,7 +381,20 @@ func TestUpdateValidationShouldError(t *testing.T) {
 					DesiredState: "installed",
 					Provisioner: store.Provisioner{
 						Provider: "aws",
+<<<<<<< HEAD
 						Options:  map[string]string{},
+||||||| merged common ancestors
+						AWSOptions: &AWSProvisionerOptions{
+							AccessKeyID:     "ACCESS_ID",
+							SecretAccessKey: "SECRET",
+						},
+=======
+						Options: map[string]string{
+							awsOptionRegion:          "us-east-1",
+							awsOptionAccessKeyID:     "ACCESS_ID",
+							awsOptionSecretAccessKey: "SECRET",
+						},
+>>>>>>> ket-server
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -227,7 +421,20 @@ func TestUpdateValidationShouldError(t *testing.T) {
 					DesiredState: "installed",
 					Provisioner: store.Provisioner{
 						Provider: "aws",
+<<<<<<< HEAD
 						Options:  map[string]string{},
+||||||| merged common ancestors
+						AWSOptions: &AWSProvisionerOptions{
+							AccessKeyID:     "ACCESS_ID_NEW",
+							SecretAccessKey: "SECRET_NEW",
+						},
+=======
+						Options: map[string]string{
+							awsOptionRegion:          "us-east-1",
+							awsOptionAccessKeyID:     "ACCESS_ID_NEW",
+							awsOptionSecretAccessKey: "SECRET_NEW",
+						},
+>>>>>>> ket-server
 					},
 					EtcdCount:    3,
 					MasterCount:  3,
@@ -254,7 +461,20 @@ func TestUpdateValidationShouldError(t *testing.T) {
 					DesiredState: "installed",
 					Provisioner: store.Provisioner{
 						Provider: "aws",
+<<<<<<< HEAD
 						Options:  map[string]string{},
+||||||| merged common ancestors
+						AWSOptions: &AWSProvisionerOptions{
+							AccessKeyID:     "ACCESS_ID",
+							SecretAccessKey: "SECRET",
+						},
+=======
+						Options: map[string]string{
+							awsOptionRegion:          "us-east-1",
+							awsOptionAccessKeyID:     "ACCESS_ID",
+							awsOptionSecretAccessKey: "SECRET",
+						},
+>>>>>>> ket-server
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -281,7 +501,20 @@ func TestUpdateValidationShouldError(t *testing.T) {
 					DesiredState: "installed",
 					Provisioner: store.Provisioner{
 						Provider: "aws",
+<<<<<<< HEAD
 						Options:  map[string]string{},
+||||||| merged common ancestors
+						AWSOptions: &AWSProvisionerOptions{
+							AccessKeyID:     "ACCESS_ID",
+							SecretAccessKey: "SECRET",
+						},
+=======
+						Options: map[string]string{
+							awsOptionRegion:          "us-east-1",
+							awsOptionAccessKeyID:     "ACCESS_ID",
+							awsOptionSecretAccessKey: "SECRET",
+						},
+>>>>>>> ket-server
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -308,7 +541,20 @@ func TestUpdateValidationShouldError(t *testing.T) {
 					DesiredState: "installed",
 					Provisioner: store.Provisioner{
 						Provider: "aws",
+<<<<<<< HEAD
 						Options:  map[string]string{},
+||||||| merged common ancestors
+						AWSOptions: &AWSProvisionerOptions{
+							AccessKeyID:     "ACCESS_ID",
+							SecretAccessKey: "SECRET",
+						},
+=======
+						Options: map[string]string{
+							awsOptionRegion:          "us-east-1",
+							awsOptionAccessKeyID:     "ACCESS_ID",
+							awsOptionSecretAccessKey: "SECRET",
+						},
+>>>>>>> ket-server
 					},
 					EtcdCount:    5,
 					MasterCount:  2,
@@ -335,7 +581,20 @@ func TestUpdateValidationShouldError(t *testing.T) {
 					DesiredState: "installed",
 					Provisioner: store.Provisioner{
 						Provider: "aws",
+<<<<<<< HEAD
 						Options:  map[string]string{},
+||||||| merged common ancestors
+						AWSOptions: &AWSProvisionerOptions{
+							AccessKeyID:     "ACCESS_ID",
+							SecretAccessKey: "SECRET",
+						},
+=======
+						Options: map[string]string{
+							awsOptionRegion:          "us-east-1",
+							awsOptionAccessKeyID:     "ACCESS_ID",
+							awsOptionSecretAccessKey: "SECRET",
+						},
+>>>>>>> ket-server
 					},
 					EtcdCount:    3,
 					MasterCount:  0,
@@ -362,7 +621,20 @@ func TestUpdateValidationShouldError(t *testing.T) {
 					DesiredState: "installed",
 					Provisioner: store.Provisioner{
 						Provider: "aws",
+<<<<<<< HEAD
 						Options:  map[string]string{},
+||||||| merged common ancestors
+						AWSOptions: &AWSProvisionerOptions{
+							AccessKeyID:     "ACCESS_ID",
+							SecretAccessKey: "SECRET",
+						},
+=======
+						Options: map[string]string{
+							awsOptionRegion:          "us-east-1",
+							awsOptionAccessKeyID:     "ACCESS_ID",
+							awsOptionSecretAccessKey: "SECRET",
+						},
+>>>>>>> ket-server
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -389,7 +661,20 @@ func TestUpdateValidationShouldError(t *testing.T) {
 					DesiredState: "installed",
 					Provisioner: store.Provisioner{
 						Provider: "aws",
+<<<<<<< HEAD
 						Options:  map[string]string{},
+||||||| merged common ancestors
+						AWSOptions: &AWSProvisionerOptions{
+							AccessKeyID:     "ACCESS_ID",
+							SecretAccessKey: "SECRET",
+						},
+=======
+						Options: map[string]string{
+							awsOptionRegion:          "us-east-1",
+							awsOptionAccessKeyID:     "ACCESS_ID",
+							awsOptionSecretAccessKey: "SECRET",
+						},
+>>>>>>> ket-server
 					},
 					EtcdCount:    3,
 					MasterCount:  2,
@@ -428,7 +713,20 @@ func TestValidation(t *testing.T) {
 			DesiredState: "installed",
 			Provisioner: store.Provisioner{
 				Provider: "aws",
+<<<<<<< HEAD
 				Options:  map[string]string{},
+||||||| merged common ancestors
+				AWSOptions: &AWSProvisionerOptions{
+					AccessKeyID:     "ACCESS_ID",
+					SecretAccessKey: "SECRET",
+				},
+=======
+				Options: map[string]string{
+					awsOptionRegion:          "us-east-1",
+					awsOptionAccessKeyID:     "ACCESS_ID",
+					awsOptionSecretAccessKey: "SECRET",
+				},
+>>>>>>> ket-server
 			},
 			EtcdCount:    3,
 			MasterCount:  2,
@@ -474,7 +772,20 @@ func TestCreateUpdateGetGetAllandDelete(t *testing.T) {
 		DesiredState: "installed",
 		Provisioner: store.Provisioner{
 			Provider: "aws",
+<<<<<<< HEAD
 			Options:  map[string]string{},
+||||||| merged common ancestors
+			AWSOptions: &AWSProvisionerOptions{
+				AccessKeyID:     "ACCESS_ID",
+				SecretAccessKey: "SECRET",
+			},
+=======
+			Options: map[string]string{
+				awsOptionRegion:          "us-east-1",
+				awsOptionAccessKeyID:     "ACCESS_ID",
+				awsOptionSecretAccessKey: "SECRET",
+			},
+>>>>>>> ket-server
 		},
 		EtcdCount:    3,
 		MasterCount:  2,
@@ -520,7 +831,20 @@ func TestCreateUpdateGetGetAllandDelete(t *testing.T) {
 		DesiredState: "installed",
 		Provisioner: store.Provisioner{
 			Provider: "aws",
+<<<<<<< HEAD
 			Options:  map[string]string{},
+||||||| merged common ancestors
+			AWSOptions: &AWSProvisionerOptions{
+				AccessKeyID:     "ACCESS_ID",
+				SecretAccessKey: "SECRET",
+			},
+=======
+			Options: map[string]string{
+				awsOptionRegion:          "us-east-1",
+				awsOptionAccessKeyID:     "ACCESS_ID",
+				awsOptionSecretAccessKey: "SECRET",
+			},
+>>>>>>> ket-server
 		},
 		EtcdCount:    3,
 		MasterCount:  2,
@@ -647,6 +971,61 @@ func TestCreateUpdateGetGetAllandDelete(t *testing.T) {
 	if len(respAll) != 1 && respAll[0].DesiredState != "destroyed" {
 		t.Errorf("handler returned unexpected body: got %v want %v",
 			rr.Body.String(), respAll)
+	}
+}
+
+func TestProviderOptions(t *testing.T) {
+	cs := &mockClustersStore{}
+	handler := Clusters{Store: cs, Logger: log.New(os.Stdout, "test", 0)}
+	clusterRequest := &ClusterRequest{
+		Name:         "foo",
+		DesiredState: "installed",
+		Provisioner: Provisioner{
+			Provider: "aws",
+			Options: map[string]string{
+				awsOptionAccessKeyID:     "ACCESS_ID",
+				awsOptionSecretAccessKey: "SECRET",
+				awsOptionRegion:          "us-east-2",
+			},
+		},
+		EtcdCount:    3,
+		MasterCount:  2,
+		WorkerCount:  5,
+		IngressCount: 2,
+	}
+	encoded, err := json.Marshal(clusterRequest)
+	if err != nil {
+		t.Fatalf("could not encode body to json %v", err)
+	}
+	req, err := http.NewRequest("POST", "/clusters", bytes.NewBuffer(encoded))
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.Create(httptest.NewRecorder(), req, httprouter.Params{})
+	cluster, err := cs.Get(clusterRequest.Name)
+	if err != nil {
+		t.Fatalf("cluster was not persisted in the store")
+	}
+	if cluster.Spec.Provisioner.Options.AWS.Region != clusterRequest.Provisioner.Options[awsOptionRegion] {
+		t.Errorf("AWS region was not persisted. Expected %s, but got %s", clusterRequest.Provisioner.Options[awsOptionRegion], cluster.Spec.Provisioner.Options.AWS.Region)
+	}
+
+	recorder := httptest.NewRecorder()
+	req, err = http.NewRequest("GET", "/clusters/"+clusterRequest.Name, nil)
+	if err != nil {
+		t.Fatalf("error building request: %v", err)
+	}
+	handler.Get(recorder, req, httprouter.Params{httprouter.Param{Key: "name", Value: clusterRequest.Name}})
+	clusterResponse := ClusterResponse{}
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("unexpected response from the server: %d", recorder.Code)
+	}
+	err = json.NewDecoder(recorder.Body).Decode(&clusterResponse)
+	if err != nil {
+		t.Fatalf("error decoding response from server: %v", err)
+	}
+	if clusterResponse.Provisioner.Options[awsOptionRegion] != clusterRequest.Provisioner.Options[awsOptionRegion] {
+		t.Errorf("cluster response has region %q, but request had region %q", clusterResponse.Provisioner.Options[awsOptionRegion], clusterRequest.Provisioner.Options[awsOptionRegion])
 	}
 }
 

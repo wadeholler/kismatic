@@ -13,10 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/apprenda/kismatic/pkg/controller"
 	"github.com/apprenda/kismatic/pkg/install"
 	"github.com/apprenda/kismatic/pkg/plan"
-
-	"github.com/apprenda/kismatic/pkg/controller"
 	"github.com/apprenda/kismatic/pkg/provision"
 	"github.com/apprenda/kismatic/pkg/server/http"
 	"github.com/apprenda/kismatic/pkg/server/http/handler"
@@ -128,9 +127,9 @@ func doServer(stdout io.Writer, options serverOptions) error {
 		}
 	}()
 
-	provisionerCreator := func(store.Cluster) provision.Provisioner {
+	provisionerCreator := func(out io.Writer) provision.Provisioner {
 		return provision.AnyTerraform{
-			Output:          os.Stdout,
+			Output:          out,
 			BinaryPath:      filepath.Join(pwd, "terraform"),
 			KismaticVersion: install.KismaticVersion.String(),
 			StateDir:        assetsDir,
@@ -150,7 +149,7 @@ func doServer(stdout io.Writer, options serverOptions) error {
 		provisionerCreator,
 		clusterStore,
 		10*time.Minute,
-		assetsDir,
+		controller.AssetsDir(assetsDir),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	go ctrl.Run(ctx)

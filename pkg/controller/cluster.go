@@ -2,12 +2,12 @@ package controller
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/apprenda/kismatic/pkg/install"
-	"github.com/apprenda/kismatic/pkg/provision"
 	"github.com/apprenda/kismatic/pkg/store"
 	"github.com/google/go-cmp/cmp"
 )
@@ -36,12 +36,13 @@ type Planner interface {
 
 // The clusterController manages the lifecycle of a single cluster.
 type clusterController struct {
+	log              *log.Logger
 	clusterName      string
 	clusterSpec      store.ClusterSpec
 	clusterAssetsDir string
-	log              *log.Logger
+	logFile          io.Writer
 	executor         install.Executor
-	newProvisioner   func(store.Cluster) provision.Provisioner
+	newProvisioner   ProvisionerCreator
 	planner          Planner
 	clusterStore     store.ClusterStore
 }
@@ -214,7 +215,7 @@ func (c *clusterController) planFilePath() string {
 
 func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
 	c.log.Printf("provisioning infrastructure for cluster %q", c.clusterName)
-	provisioner := c.newProvisioner(cluster)
+	provisioner := c.newProvisioner(c.logFile)
 	fp := install.FilePlanner{File: c.planFilePath()}
 	plan, err := fp.Read()
 	if err != nil {
@@ -243,7 +244,7 @@ func (c *clusterController) provision(cluster store.Cluster) store.Cluster {
 
 func (c *clusterController) destroy(cluster store.Cluster) store.Cluster {
 	c.log.Printf("destroying cluster %q", c.clusterName)
-	provisioner := c.newProvisioner(cluster)
+	provisioner := c.newProvisioner(c.logFile)
 	if err := provisioner.Destroy(cluster.Spec.Provisioner.Provider, c.clusterName); err != nil {
 		c.log.Printf("error destroying cluster %q: %v", c.clusterName, err)
 		cluster.Status.CurrentState = destroyFailed

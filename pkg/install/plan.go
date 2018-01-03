@@ -7,14 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/apprenda/kismatic/pkg/util"
-	garbler "github.com/michaelbironneau/garbler/lib"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -126,6 +124,14 @@ func readDeprecatedFields(p *Plan) {
 }
 
 func setDefaults(p *Plan) {
+	if p.Docker.Logs.Driver == "" {
+		p.Docker.Logs.Driver = "json-file"
+		p.Docker.Logs.Opts = map[string]string{
+			"max-size": "50m",
+			"max-file": "1",
+		}
+	}
+
 	if p.AddOns.CNI == nil {
 		p.AddOns.CNI = &CNI{}
 		p.AddOns.CNI.Provider = cniProviderCalico
@@ -138,6 +144,13 @@ func setDefaults(p *Plan) {
 	}
 	if p.AddOns.CNI.Options.Calico.LogLevel == "" {
 		p.AddOns.CNI.Options.Calico.LogLevel = "info"
+	}
+	if p.AddOns.CNI.Options.Calico.FelixInputMTU == 0 {
+		p.AddOns.CNI.Options.Calico.FelixInputMTU = 1440
+	}
+
+	if p.AddOns.CNI.Options.Calico.WorkloadMTU == 0 {
+		p.AddOns.CNI.Options.Calico.WorkloadMTU = 1500
 	}
 
 	if p.AddOns.HeapsterMonitoring == nil {
@@ -279,13 +292,6 @@ func (fp *FilePlanner) PlanExists() bool {
 
 // WritePlanTemplate writes an installation plan with pre-filled defaults.
 func WritePlanTemplate(planTemplateOpts PlanTemplateOptions, w PlanReadWriter) error {
-	if planTemplateOpts.AdminPassword == "" {
-		pw, err := generateAlphaNumericPassword()
-		if err != nil {
-			return fmt.Errorf("error generating random password: %v", err)
-		}
-		planTemplateOpts.AdminPassword = pw
-	}
 	p := buildPlanFromTemplateOptions(planTemplateOpts)
 	if err := w.Write(&p); err != nil {
 		return fmt.Errorf("error writing installation plan template: %v", err)
@@ -326,6 +332,15 @@ func buildPlanFromTemplateOptions(templateOpts PlanTemplateOptions) Plan {
 	p.Cluster.Certificates.Expiry = "17520h"
 	p.Cluster.Certificates.CAExpiry = defaultCAExpiry
 
+	// Docker
+	p.Docker.Logs = DockerLogs{
+		Driver: "json-file",
+		Opts: map[string]string{
+			"max-size": "50m",
+			"max-file": "1",
+		},
+	}
+
 	// Add-Ons
 	// CNI
 	p.AddOns.CNI = &CNI{}
@@ -336,6 +351,8 @@ func buildPlanFromTemplateOptions(templateOpts PlanTemplateOptions) Plan {
 		p.AddOns.CNI.Provider = cniProviderCalico
 		p.AddOns.CNI.Options.Calico.Mode = "overlay"
 		p.AddOns.CNI.Options.Calico.LogLevel = "info"
+		p.AddOns.CNI.Options.Calico.WorkloadMTU = 1500
+		p.AddOns.CNI.Options.Calico.FelixInputMTU = 1440
 	}
 
 	// Heapster
@@ -406,31 +423,6 @@ func getDNSServiceIP(p *Plan) (string, error) {
 	return ip.To4().String(), nil
 }
 
-func generateAlphaNumericPassword() (string, error) {
-	attempts := 0
-	for {
-		reqs := &garbler.PasswordStrengthRequirements{
-			MinimumTotalLength: 16,
-			Uppercase:          rand.Intn(6),
-			Digits:             rand.Intn(6),
-			Punctuation:        -1, // disable punctuation
-		}
-		pass, err := garbler.NewPassword(reqs)
-		if err != nil {
-			return "", err
-		}
-		// validate that the library actually returned an alphanumeric password
-		re := regexp.MustCompile("^[a-zA-Z1-9]+$")
-		if re.MatchString(pass) {
-			return pass, nil
-		}
-		if attempts == 5 {
-			return "", errors.New("failed to generate alphanumeric password")
-		}
-		attempts++
-	}
-}
-
 // The comment map contains is keyed by the value that should be commented
 // in the plan file. The value of the map contains the comment, split into
 // separate lines.
@@ -479,6 +471,8 @@ var commentMap = map[string][]string{
 	"add_ons.cni.provider":                               []string{"Selecting 'custom' will result in a CNI ready cluster, however it is up to", "you to configure a plugin after the install.", "Options: 'calico','weave','contiv','custom'."},
 	"add_ons.cni.options.calico.mode":                    []string{"Options: 'overlay','routed'."},
 	"add_ons.cni.options.calico.log_level":               []string{"Options: 'warning','info','debug'."},
+	"add_ons.cni.options.calico.workload_mtu":            []string{"MTU for the workload interface, configures the CNI config."},
+	"add_ons.cni.options.calico.felix_input_mtu":         []string{"MTU for the tunnel device used if IPIP is enabled."},
 	"add_ons.heapster.options.influxdb.pvc_name":         []string{"Provide the name of the persistent volume claim that you will create", "after installation. If not specified, the data will be stored in", "ephemeral storage."},
 	"add_ons.heapster.options.heapster.service_type":     []string{"Specify kubernetes ServiceType. Defaults to 'ClusterIP'.", "Options: 'ClusterIP','NodePort','LoadBalancer','ExternalName'."},
 	"add_ons.heapster.options.heapster.sink":             []string{"Specify the sink to store heapster data. Defaults to an influxdb pod", "running on the cluster."},

@@ -69,9 +69,19 @@ type ClusterCatalog struct {
 	DiagnosticsDirectory string `yaml:"diagnostics_dir"`
 	DiagnosticsDateTime  string `yaml:"diagnostics_date_time"`
 
-	DockerDirectLVMEnabled                 bool   `yaml:"docker_direct_lvm_enabled"`
-	DockerDirectLVMBlockDevicePath         string `yaml:"docker_direct_lvm_block_device_path"`
-	DockerDirectLVMDeferredDeletionEnabled bool   `yaml:"docker_direct_lvm_deferred_deletion_enabled"`
+	Docker struct {
+		Logs struct {
+			Driver string            `yaml:"driver"`
+			Opts   map[string]string `yaml:"opts"`
+		}
+		Storage struct {
+			DirectLVM struct {
+				Enabled                bool   `yaml:"enabled"`
+				BlockDevice            string `yaml:"block_device"`
+				EnableDeferredDeletion bool   `yaml:"enable_deferred_deletion"`
+			}
+		}
+	}
 
 	LocalKubeconfigDirectory string `yaml:"local_kubeconfig_directory"`
 
@@ -89,8 +99,10 @@ type ClusterCatalog struct {
 		Provider string
 		Options  struct {
 			Calico struct {
-				Mode     string
-				LogLevel string `yaml:"log_level"`
+				Mode          string
+				LogLevel      string `yaml:"log_level"`
+				WorkloadMTU   int    `yaml:"workload_mtu"`
+				FelixInputMTU int    `yaml:"felix_input_mtu"`
 			}
 		}
 	}

@@ -18,8 +18,8 @@ ANSIBLE_VERSION = 2.3.0.0
 TERRAFORM_VERSION = 0.11.0
 KUBERANG_VERSION = v1.2.2
 GO_VERSION = 1.8.4
-KUBECTL_VERSION = v1.8.4
-HELM_VERSION = v2.7.0
+KUBECTL_VERSION = v1.9.0
+HELM_VERSION = v2.7.2
 
 ifeq ($(origin GLIDE_GOOS), undefined)
 	GLIDE_GOOS := $(HOST_GOOS)
@@ -85,6 +85,7 @@ clean:
 	rm -rf vendor
 	rm -rf vendor-ansible
 	rm -rf vendor-terraform
+	rm -rf integration-tests/vendor
 	rm -rf vendor-kuberang
 	rm -rf vendor-helm
 	rm -rf vendor-kubectl
@@ -181,20 +182,21 @@ bare-dist: vendor-ansible/out vendor-terraform/out vendor-kuberang/$(KUBERANG_VE
 	tar -czf kismatic.tar.gz -C out .
 	mv kismatic.tar.gz out
 
-get-ginkgo:
+integration-tests/vendor: tools/glide-$(GLIDE_GOOS)-$(HOST_GOARCH)
 	go get github.com/onsi/ginkgo/ginkgo
+	cd integration-tests && ../tools/glide-$(GLIDE_GOOS)-$(HOST_GOARCH) install
 
-just-integration-test: get-ginkgo
-	ginkgo --skip "\[slow\]" -p $(GINKGO_OPTS) -v integration
+just-integration-test: integration-tests/vendor
+	ginkgo --skip "\[slow\]" -p $(GINKGO_OPTS) -v integration-tests
 
-slow-integration-test: get-ginkgo
-	ginkgo --focus "\[slow\]" -p $(GINKGO_OPTS) -v integration
+slow-integration-test: integration-tests/vendor
+	ginkgo --focus "\[slow\]" -p $(GINKGO_OPTS) -v integration-tests
 
-serial-integration-test: get-ginkgo
-	ginkgo -v integration
+serial-integration-test: integration-tests/vendor
+	ginkgo -v integration-tests
 
-focus-integration-test: get-ginkgo
-	ginkgo --focus $(FOCUS) $(GINKGO_OPTS) -v integration
+focus-integration-test: integration-tests/vendor
+	ginkgo --focus $(FOCUS) $(GINKGO_OPTS) -v integration-tests
 
 docs/generate-kismatic-cli:
 	mkdir -p docs/kismatic-cli

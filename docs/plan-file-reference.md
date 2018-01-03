@@ -8,7 +8,7 @@
     * [location](#provisionerazure_optionslocation)
 * [cluster](#cluster)
   * [name](#clustername)
-  * [admin_password](#clusteradmin_password)
+  * [admin_password _(deprecated)_](#clusteradmin_password-deprecated)
   * [disable_package_installation](#clusterdisable_package_installation)
   * [allow_package_installation _(deprecated)_](#clusterallow_package_installation-deprecated)
   * [disconnected_installation](#clusterdisconnected_installation)
@@ -41,6 +41,9 @@
     * [provider](#clustercloud_providerprovider)
     * [config](#clustercloud_providerconfig)
 * [docker](#docker)
+  * [logs](#dockerlogs)
+    * [driver](#dockerlogsdriver)
+    * [opts](#dockerlogsopts)
   * [storage](#dockerstorage)
     * [direct_lvm](#dockerstoragedirect_lvm)
       * [enabled](#dockerstoragedirect_lvmenabled)
@@ -61,6 +64,8 @@
       * [calico](#add_onscnioptionscalico)
         * [mode](#add_onscnioptionscalicomode)
         * [log_level](#add_onscnioptionscalicolog_level)
+        * [workload_mtu](#add_onscnioptionscalicoworkload_mtu)
+        * [felix_input_mtu](#add_onscnioptionscalicofelix_input_mtu)
   * [dns](#add_onsdns)
     * [disable](#add_onsdnsdisable)
   * [heapster](#add_onsheapster)
@@ -193,14 +198,14 @@
 | **Required** |  Yes |
 | **Default** | ` ` | 
 
-###  cluster.admin_password
+###  cluster.admin_password _(deprecated)_
 
- The password for the admin user. This is mainly used to access the Kubernetes Dashboard. 
+ The password for the admin user. If provided, ABAC will be enabled in the cluster. This field will be removed completely in a future release. 
 
 | | |
 |----------|-----------------|
 | **Kind** |  string |
-| **Required** |  Yes |
+| **Required** |  No |
 | **Default** | ` ` | 
 
 ###  cluster.disable_package_installation
@@ -465,6 +470,30 @@
 
  Configuration for the docker engine installed by KET 
 
+###  docker.logs
+
+ Log configuration for the docker engine 
+
+###  docker.logs.driver
+
+ Docker logging driver, more details https://docs.docker.com/engine/admin/logging/overview/ 
+
+| | |
+|----------|-----------------|
+| **Kind** |  string |
+| **Required** |  No |
+| **Default** | `json-file` | 
+
+###  docker.logs.opts
+
+ Driver specific options 
+
+| | |
+|----------|-----------------|
+| **Kind** |  map[string]string |
+| **Required** |  No |
+| **Default** | ` ` | 
+
 ###  docker.storage
 
  Storage configuration for the docker engine 
@@ -625,6 +654,26 @@
 | **Required** |  No |
 | **Default** | `info` | 
 | **Options** |  `warning`, `info`, `debug`
+
+###  add_ons.cni.options.calico.workload_mtu
+
+ MTU for the workload interface, configures the CNI config 
+
+| | |
+|----------|-----------------|
+| **Kind** |  int |
+| **Required** |  No |
+| **Default** | `1500` | 
+
+###  add_ons.cni.options.calico.felix_input_mtu
+
+ MTU for the tunnel device used if IPIP is enabled 
+
+| | |
+|----------|-----------------|
+| **Kind** |  int |
+| **Required** |  No |
+| **Default** | `1440` | 
 
 ###  add_ons.dns
 

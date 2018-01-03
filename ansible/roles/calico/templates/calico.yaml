@@ -1,9 +1,9 @@
-# Calico Version v2.6.3
-# https://docs.projectcalico.org/v2.6/releases#v2.6.3
+# Calico Version v2.6.4
+# https://docs.projectcalico.org/v2.6/releases#v2.6.4
 # This manifest includes the following component versions:
-#   calico/node:v2.6.3
-#   calico/cni:v1.11.1
-#   calico/kube-controllers:v1.0.1
+#   calico/node:v2.6.4
+#   calico/cni:v1.11.2
+#   calico/kube-controllers:v1.0.2
 
 # This ConfigMap is used to configure a self-hosted Calico installation.
 kind: ConfigMap
@@ -28,7 +28,7 @@ data:
         "etcd_cert_file": "{{ kubernetes_certificates.etcd_client }}",
         "etcd_ca_cert_file": "{{ kubernetes_certificates.ca }}",
         "log_level": "{{ cni.options.calico.log_level }}",
-        "mtu": 1500,
+        "mtu": {{ cni.options.calico.workload_mtu }},
         "ipam": {
             "type": "calico-ipam"
         },
@@ -74,6 +74,8 @@ spec:
         k8s-app: calico-node
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
+        prometheus.io/port: "9091"
+        prometheus.io/scrape: "true"
     spec:
       hostNetwork: true
       serviceAccountName: calico-node
@@ -124,7 +126,7 @@ spec:
               value: "{{ cni.options.calico.log_level }}"
             # Set MTU for tunnel device used if ipip is enabled
             - name: FELIX_IPINIPMTU
-              value: "1440"
+              value: "{{ cni.options.calico.felix_input_mtu }}"
             # Set to enable the Prometheus metrics server in Felix.
             - name: FELIX_PROMETHEUSMETRICSENABLED
               value: "true"

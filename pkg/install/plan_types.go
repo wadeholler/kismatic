@@ -91,9 +91,11 @@ type Cluster struct {
 	// cluster name, such as kubeconfig files and certificates.
 	// +required
 	Name string
-	// The password for the admin user. This is mainly used to access the Kubernetes Dashboard.
-	// +required
-	AdminPassword string `yaml:"admin_password"`
+	// The password for the admin user.
+	// If provided, ABAC will be enabled in the cluster.
+	// This field will be removed completely in a future release.
+	// +deprecated
+	AdminPassword string `yaml:"admin_password,omitempty"`
 	// Whether KET should install the packages on the cluster nodes.
 	// When true, KET will not install the required packages.
 	// Instead, it will verify that the packages have been installed by the operator.
@@ -227,8 +229,19 @@ type CloudProvider struct {
 
 // Docker includes the configuration for the docker installation owned by KET.
 type Docker struct {
+	// Log configuration for the docker engine
+	Logs DockerLogs
 	// Storage configuration for the docker engine
 	Storage DockerStorage
+}
+
+// DockerLogs includes the log-specific configuration for docker.
+type DockerLogs struct {
+	// Docker logging driver, more details https://docs.docker.com/engine/admin/logging/overview/
+	// +default=json-file
+	Driver string
+	// Driver specific options
+	Opts map[string]string
 }
 
 // DockerStorage includes the storage-specific configuration for docker.
@@ -340,6 +353,12 @@ type CalicoOptions struct {
 	// +default=info
 	// +options=warning,info,debug
 	LogLevel string `yaml:"log_level"`
+	// MTU for the workload interface, configures the CNI config
+	// +default=1500
+	WorkloadMTU int `yaml:"workload_mtu"`
+	// MTU for the tunnel device used if IPIP is enabled
+	// +default=1440
+	FelixInputMTU int `yaml:"felix_input_mtu"`
 }
 
 // The DNS add-on configuration

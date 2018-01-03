@@ -113,10 +113,6 @@ imports:
   version: cdc68dd1f170b8dfc1a0d2231b5bb0967ed67006
   subpackages:
   - cmd/archiver
-- name: github.com/michaelbironneau/garbler
-  version: eaea49f3709333a999768eddd70d24eba599e78d
-  subpackages:
-  - lib
 - name: github.com/mitchellh/go-homedir
   version: b8bc1bf767474819792c23f32d8286a45736f1c6
 - name: github.com/mreiferson/go-httpclient

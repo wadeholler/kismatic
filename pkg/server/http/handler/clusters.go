@@ -15,15 +15,18 @@ import (
 	"github.com/mholt/archiver"
 )
 
-// ErrClusterNotFound is the error returned by the API when a requested cluster
-// is not found in the server.
-var ErrClusterNotFound = errors.New("cluster details not found in the store")
+var (
+	awsOptionAccessKeyID     = "accessKeyId"
+	awsOptionSecretAccessKey = "secretAccessKey"
+	awsOptionRegion          = "region"
 
-// the states that can be requested through the API
-var validStates = []string{"planned", "provisioned", "installed"}
+	// ErrClusterNotFound is the error returned by the API when a requested cluster
+	// is not found in the server.
+	ErrClusterNotFound = errors.New("cluster details not found in the store")
 
-// the provisioners that are supported
-var validProvisionerProviders = []string{"aws"}
+	// the states that can be requested through the API
+	validStates = []string{"planned", "provisioned", "installed"}
+)
 
 // The Clusters handler exposes endpoints for managing the lifecycle of clusters
 type Clusters struct {
