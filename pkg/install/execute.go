@@ -872,7 +872,7 @@ func (ae *ansibleExecutor) preflightExplainer() explain.AnsibleEventExplainer {
 func buildInventoryFromPlan(p *Plan) ansible.Inventory {
 	etcdNodes := []ansible.Node{}
 	for _, n := range p.Etcd.Nodes {
-		etcdNodes = append(etcdNodes, installNodeToAnsibleNode(&n, &p.Cluster.SSH))
+		etcdNodes = append(etcdNodes, installNodeToAnsibleNode(n.Node(), &p.Cluster.SSH))
 	}
 	masterNodes := []ansible.Node{}
 	for _, n := range p.Master.Nodes {

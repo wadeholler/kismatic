@@ -55,7 +55,7 @@ type Plan struct {
 	Features *Features `yaml:"features,omitempty"`
 	// Etcd nodes of the cluster
 	// +required
-	Etcd NodeGroup
+	Etcd KubelessNodeGroup
 	// Master nodes of the cluster
 	// +required
 	Master MasterNodeGroup
@@ -463,6 +463,37 @@ type NodeGroup struct {
 	Nodes []Node
 }
 
+func (ng NodeGroup) KubelessNodeGroup() *KubelessNodeGroup {
+	nodes := make([]KubelessNode, len(ng.Nodes))
+	for i := range ng.Nodes {
+		nodes[i] = *ng.Nodes[i].KubelessNode()
+	}
+	return &KubelessNodeGroup{
+		ExpectedCount: ng.ExpectedCount,
+		Nodes:         nodes,
+	}
+}
+
+type KubelessNodeGroup struct {
+	// Number of nodes.
+	// +required
+	ExpectedCount int `yaml:"expected_count"`
+	// List of nodes.
+	// +required
+	Nodes []KubelessNode
+}
+
+func (kng KubelessNodeGroup) NodeGroup() *NodeGroup {
+	nodes := make([]Node, len(kng.Nodes))
+	for i := range kng.Nodes {
+		nodes[i] = *kng.Nodes[i].Node()
+	}
+	return &NodeGroup{
+		ExpectedCount: kng.ExpectedCount,
+		Nodes:         nodes,
+	}
+}
+
 // An OptionalNodeGroup is a collection of nodes that can be empty
 type OptionalNodeGroup NodeGroup
 
@@ -488,6 +519,36 @@ type Node struct {
 	// Kubelet configuration applied to this node.
 	// If a node is repeated for multiple roles, the overrides cannot be different.
 	KubeletOptions KubeletOptions `yaml:"kubelet,omitempty"`
+}
+
+func (n Node) KubelessNode() *KubelessNode {
+	return &KubelessNode{
+		IP:         n.IP,
+		InternalIP: n.InternalIP,
+		Host:       n.Host,
+	}
+}
+
+type KubelessNode struct {
+	// The hostname of the node. The hostname is verified
+	// in the validation phase of the installation.
+	// +required
+	Host string
+	// The IP address of the node. This is the IP address that will be used to
+	// connect to the node over SSH.
+	// +required
+	IP string
+	// The internal (or private) IP address of the node.
+	// If set, this IP will be used when configuring cluster components.
+	InternalIP string
+}
+
+func (kn KubelessNode) Node() *Node {
+	return &Node{
+		IP:         kn.IP,
+		InternalIP: kn.InternalIP,
+		Host:       kn.Host,
+	}
 }
 
 // Equal returns true of 2 nodes have the same host, IP and InternalIP
@@ -562,7 +623,7 @@ func (p *Plan) GetUniqueNodes() []Node {
 
 func (p *Plan) getAllNodes() []Node {
 	nodes := []Node{}
-	nodes = append(nodes, p.Etcd.Nodes...)
+	nodes = append(nodes, p.Etcd.NodeGroup().Nodes...)
 	nodes = append(nodes, p.Master.Nodes...)
 	nodes = append(nodes, p.Worker.Nodes...)
 	if p.Ingress.Nodes != nil {
@@ -624,7 +685,7 @@ func (p *Plan) GetSSHConnection(host string) (*SSHConnection, error) {
 		case "master":
 			foundNode = firstIfItExists(p.Master.Nodes)
 		case "etcd":
-			foundNode = firstIfItExists(p.Etcd.Nodes)
+			foundNode = firstIfItExists(p.Etcd.NodeGroup().Nodes)
 		case "worker":
 			foundNode = firstIfItExists(p.Worker.Nodes)
 		case "ingress":
@@ -673,7 +734,7 @@ func (p *Plan) GetRolesForIP(ip string) []string {
 		allRoles = append(allRoles, "master")
 	}
 
-	if hasIP(&p.Etcd.Nodes, ip) {
+	if hasIP(&p.Etcd.NodeGroup().Nodes, ip) {
 		allRoles = append(allRoles, "etcd")
 	}
 

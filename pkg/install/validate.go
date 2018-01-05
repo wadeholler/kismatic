@@ -146,7 +146,7 @@ func (p *Plan) validate() (bool, []error) {
 	v.validateWithErrPrefix("Docker", p.Docker)
 	v.validate(&p.AddOns)
 	v.validate(nodeList{Nodes: p.getAllNodes()})
-	v.validateWithErrPrefix("Etcd nodes", &p.Etcd)
+	v.validateWithErrPrefix("Etcd nodes", p.Etcd.NodeGroup())
 	v.validateWithErrPrefix("Master nodes", &p.Master)
 	v.validateWithErrPrefix("Worker nodes", &p.Worker)
 	v.validateWithErrPrefix("Ingress nodes", &p.Ingress)

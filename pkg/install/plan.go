@@ -337,8 +337,9 @@ func buildPlanFromTemplateOptions(templateOpts PlanTemplateOptions) Plan {
 	}
 
 	n := Node{}
+	kn := KubelessNode{}
 	for i := 0; i < p.Etcd.ExpectedCount; i++ {
-		p.Etcd.Nodes = append(p.Etcd.Nodes, n)
+		p.Etcd.Nodes = append(p.Etcd.Nodes, kn)
 	}
 
 	for i := 0; i < p.Master.ExpectedCount; i++ {
