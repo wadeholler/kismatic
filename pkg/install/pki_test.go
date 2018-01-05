@@ -1076,7 +1076,7 @@ func TestGenerateCertificate(t *testing.T) {
 			if err != nil {
 				t.Errorf("test %d: could not parse validityPeriod %s", i, test.validityPeriod)
 			} else {
-				expirationDate := time.Now().Add(time.Duration(validity) * time.Hour)
+				expirationDate := time.Now().UTC().Add(time.Duration(validity) * time.Hour)
 				if cert.NotAfter.Year() != expirationDate.Year() || cert.NotAfter.YearDay() != expirationDate.YearDay() {
 					t.Errorf("test %d: bad expiration date on generated cert. expected %v, got %v", i, expirationDate, cert.NotAfter)
 				}
