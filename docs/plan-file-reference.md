@@ -91,9 +91,6 @@
     * [host](#etcdnodeshost)
     * [ip](#etcdnodesip)
     * [internalip](#etcdnodesinternalip)
-    * [labels](#etcdnodeslabels)
-    * [kubelet](#etcdnodeskubelet)
-      * [option_overrides](#etcdnodeskubeletoption_overrides)
 * [master](#master)
   * [expected_count](#masterexpected_count)
   * [load_balanced_fqdn](#masterload_balanced_fqdn)
@@ -858,30 +855,6 @@
 | | |
 |----------|-----------------|
 | **Kind** |  string |
-| **Required** |  No |
-| **Default** | ` ` | 
-
-###  etcd.nodes.labels
-
- Labels to add when installing the node in the cluster. If a node is defined under multiple roles, the labels for that node will be merged. If a label is repeated for the same node, only one will be used in this order: etcd,master,worker,ingress,storage roles where 'storage' has the highest precedence. It is recommended to use reverse-DNS notation to avoid collision with other labels. 
-
-| | |
-|----------|-----------------|
-| **Kind** |  map[string]string |
-| **Required** |  No |
-| **Default** | ` ` | 
-
-###  etcd.nodes.kubelet
-
- Kubelet configuration applied to this node. If a node is repeated for multiple roles, the overrides cannot be different. 
-
-###  etcd.nodes.kubelet.option_overrides
-
- Listing of option overrides that are to be applied to the Kubelet configurations. This is an advanced feature that can prevent the Kubelet from starting up if invalid configuration is provided. 
-
-| | |
-|----------|-----------------|
-| **Kind** |  map[string]string |
 | **Required** |  No |
 | **Default** | ` ` | 
 
