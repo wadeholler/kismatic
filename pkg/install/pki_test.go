@@ -63,14 +63,14 @@ func getPlan() *Plan {
 		AddOns: AddOns{
 			CNI: &CNI{},
 		},
-		Etcd: NodeGroup{
-			Nodes: []Node{
-				Node{
+		Etcd: KubelessNodeGroup{
+			Nodes: []KubelessNode{
+				KubelessNode{
 					Host:       "etcd01",
 					IP:         "99.99.99.99",
 					InternalIP: "88.88.88.88",
 				},
-				Node{
+				KubelessNode{
 					Host:       "etcd02",
 					IP:         "99.99.99.99",
 					InternalIP: "88.88.88.88",
@@ -553,7 +553,7 @@ func TestLoadBalancedNamesNotInEtcdCert(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error generating CA for test: %v", err)
 	}
-	if err = pki.GenerateNodeCertificate(p, p.Etcd.Nodes[0], ca); err != nil {
+	if err = pki.GenerateNodeCertificate(p, *p.Etcd.Nodes[0].Node(), ca); err != nil {
 		t.Fatalf("failed to generate certs: %v", err)
 	}
 
@@ -740,7 +740,7 @@ func TestValidateClusterCertificatesInvalidCerts(t *testing.T) {
 			plan: func(p Plan) Plan {
 				etcd := p.Etcd.Nodes[0]
 				etcd.IP = "20.0.0.1"
-				p.Etcd.Nodes = []Node{etcd}
+				p.Etcd.Nodes = []KubelessNode{etcd}
 				return p
 			},
 			expectedWarnings: 1,

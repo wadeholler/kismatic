@@ -41,9 +41,9 @@ var validPlan = Plan{
 			},
 		},
 	},
-	Etcd: NodeGroup{
+	Etcd: KubelessNodeGroup{
 		ExpectedCount: 1,
-		Nodes: []Node{
+		Nodes: []KubelessNode{
 			{
 				Host: "etcd01",
 				IP:   "192.168.205.10",
@@ -200,7 +200,7 @@ func TestValidatePlanEmptyLoadBalancedShortName(t *testing.T) {
 func TestValidatePlanNoEtcdNodes(t *testing.T) {
 	p := validPlan
 	p.Etcd.ExpectedCount = 0
-	p.Etcd.Nodes = []Node{}
+	p.Etcd.Nodes = []KubelessNode{}
 	assertInvalidPlan(t, p)
 }
 
@@ -239,7 +239,7 @@ func TestValidatePlanWorkerNodesMismatch(t *testing.T) {
 func TestValidatePlanUnexpectedEtcdNodes(t *testing.T) {
 	p := validPlan
 	p.Etcd.ExpectedCount = 1
-	p.Etcd.Nodes = []Node{
+	p.Etcd.Nodes = []KubelessNode{
 		{
 			Host: "etcd01",
 			IP:   "192.168.205.10",

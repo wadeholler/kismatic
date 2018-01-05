@@ -93,9 +93,9 @@ func getSafePodWithCreatedByRef(t *testing.T, nodeName string, createdByKind str
 
 func TestDetectNodeUpgradeSafetyEtcdCountUnsafe(t *testing.T) {
 	plan := Plan{
-		Etcd: NodeGroup{
+		Etcd: KubelessNodeGroup{
 			ExpectedCount: 1,
-			Nodes: []Node{
+			Nodes: []KubelessNode{
 				{
 					Host: "foo",
 					IP:   "10.0.0.1",
@@ -105,7 +105,7 @@ func TestDetectNodeUpgradeSafetyEtcdCountUnsafe(t *testing.T) {
 	}
 	node := plan.Etcd.Nodes[0]
 	k8sClient := fakeUpgradeKubeClient{}
-	errs := DetectNodeUpgradeSafety(plan, node, k8sClient)
+	errs := DetectNodeUpgradeSafety(plan, *node.Node(), k8sClient)
 	if len(errs) != 1 {
 		t.Errorf("Expected %d errors, but got %v", 1, errs)
 	} else if _, ok := errs[0].(etcdNodeCountErr); !ok {
